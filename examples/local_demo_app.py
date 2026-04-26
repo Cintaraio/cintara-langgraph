@@ -332,6 +332,33 @@ INDEX_HTML = """<!doctype html>
         font-weight: 850;
       }
 
+      .powered-by {
+        position: fixed;
+        right: 18px;
+        bottom: 18px;
+        z-index: 20;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        border: 1px solid rgba(24, 32, 24, 0.08);
+        border-radius: 999px;
+        background: rgba(255, 253, 244, 0.94);
+        box-shadow: 0 10px 24px rgba(31, 52, 28, 0.12);
+        color: #526052;
+        font-size: 12px;
+        font-weight: 850;
+        line-height: 1;
+        padding: 8px 12px;
+        text-decoration: none;
+        backdrop-filter: blur(12px);
+      }
+
+      .powered-by img {
+        width: 18px;
+        height: 18px;
+        object-fit: contain;
+      }
+
       @media (max-width: 820px) {
         .hero, .output, .diagram { grid-template-columns: 1fr; }
         .intro { padding: 24px; }
@@ -391,6 +418,11 @@ INDEX_HTML = """<!doctype html>
           <pre id="result">{}</pre>
         </article>
       </section>
+
+      <a class="powered-by" href="https://cintara.io" target="_blank" rel="noreferrer" aria-label="Powered by Cintara">
+        <span>Powered by Cintara</span>
+        <img src="https://apps.cintara.io/govexec-pilot/cintara-logo.png" alt="Cintara logo">
+      </a>
     </main>
 
     <script>
