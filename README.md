@@ -124,7 +124,7 @@ python3 examples/local_demo_app.py
 
 Then open `http://127.0.0.1:8090`.
 
-This demo is intentionally separate from the Cintara Control Plane UI and the SOC 2 status page. It uses a local fake Cintara decision client, but still runs a real LangGraph workflow with `CintaraGuard` as the pre-tool guard step.
+This demo uses a local fake Cintara decision client, but still runs a real LangGraph workflow with `CintaraGuard` as the pre-tool guard step.
 
 ## Expected State Shape
 

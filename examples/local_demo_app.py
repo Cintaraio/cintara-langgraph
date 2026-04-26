@@ -353,7 +353,6 @@ INDEX_HTML = """<!doctype html>
             <div class="node"><strong>2. Cintara</strong><span>Evaluates the action as allow, approval, or deny.</span></div>
             <div class="node"><strong>3. Tool</strong><span>Runs only when Cintara routes the graph to tools.</span></div>
           </div>
-          <span class="pill">Separate from the Control Plane UI and SOC 2 status page</span>
         </article>
 
         <form class="card" id="demo-form">
