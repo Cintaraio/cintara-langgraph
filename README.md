@@ -58,6 +58,15 @@ export CINTARA_TENANT_ID="..."
 
 `agent_id` is the only value application code normally needs to pass directly. Base URL, token, and tenant can come from environment configuration.
 
+For split-service deployments, point the guard at the public Policy service:
+
+```bash
+export CINTARA_POLICY_URL="https://policy.example.com"
+export CINTARA_REGISTRY_URL="https://registry.example.com"
+```
+
+`CINTARA_POLICY_URL` takes precedence over `CINTARA_BASE_URL` for policy decisions. `CINTARA_REGISTRY_URL` is used only by the real API quickstart to create demo agents and tools.
+
 ## 5-Minute Real API Quickstart
 
 Install with LangGraph support:
@@ -70,6 +79,8 @@ Set your Cintara API configuration:
 
 ```bash
 export CINTARA_BASE_URL="http://localhost:8000"
+export CINTARA_POLICY_URL="http://localhost:8003"
+export CINTARA_REGISTRY_URL="http://localhost:8004"
 export CINTARA_API_TOKEN="..."
 export CINTARA_TENANT_ID="..."
 ```
@@ -102,6 +113,18 @@ python3 examples/offline_smoke.py
 ```
 
 This compiles a real LangGraph graph, calls `CintaraGuard`, routes through `allow`, and executes the mock tool node.
+
+## Local Browser Demo
+
+To see the LangGraph integration in a small browser app:
+
+```bash
+python3 examples/local_demo_app.py
+```
+
+Then open `http://127.0.0.1:8090`.
+
+This demo is intentionally separate from the Cintara Control Plane UI and the SOC 2 status page. It uses a local fake Cintara decision client, but still runs a real LangGraph workflow with `CintaraGuard` as the pre-tool guard step.
 
 ## Expected State Shape
 

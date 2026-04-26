@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import unittest
+from unittest.mock import patch
 
-from cintara_langgraph import CintaraDecision, CintaraGuard, CintaraToolCall, extract_tool_call
+from cintara_langgraph import CintaraClient, CintaraDecision, CintaraGuard, CintaraToolCall, extract_tool_call
 
 
 class FakeClient:
@@ -18,6 +19,34 @@ class FakeClient:
 class Message:
     def __init__(self, tool_calls):
         self.tool_calls = tool_calls
+
+
+class FakeResponse:
+    def raise_for_status(self):
+        return None
+
+    def json(self):
+        return {
+            "request_id": "req_1",
+            "action": "ALLOW",
+            "reason": "ok",
+        }
+
+
+class FakeHTTPClient:
+    def __init__(self, timeout):
+        self.timeout = timeout
+        self.calls = []
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
+
+    def post(self, url, headers, json):
+        self.calls.append({"url": url, "headers": headers, "json": json})
+        return FakeResponse()
 
 
 class CintaraGuardTests(unittest.TestCase):
@@ -120,6 +149,37 @@ class CintaraGuardTests(unittest.TestCase):
         self.assertFalse(update["cintara"]["allowed"])
         self.assertEqual(update["cintara"]["route"], "error")
         self.assertIn("offline", update["cintara"]["error"])
+
+    def test_client_sends_production_request_context(self):
+        fake_http = FakeHTTPClient(timeout=10.0)
+
+        with patch("cintara_langgraph.client.httpx.Client", return_value=fake_http):
+            client = CintaraClient(
+                base_url="https://policy.example.com",
+                token="token-1",
+                tenant_id="00000000-0000-0000-0000-000000000001",
+            )
+            decision = client.decide(
+                agent_id="agent-1",
+                tool_call=CintaraToolCall(name="send_email", args={"body": "hello"}),
+                user_id="user-1",
+                session_context={
+                    "user_email": "user@example.com",
+                    "user_roles": ["tenant_admin"],
+                    "user_privileges": ["PAGE_POLICIES_VIEW"],
+                    "request_ip": "203.0.113.10",
+                    "user_agent": "pytest",
+                },
+            )
+
+        self.assertEqual(decision.action, "ALLOW")
+        payload = fake_http.calls[0]["json"]
+        self.assertEqual(fake_http.calls[0]["url"], "https://policy.example.com/api/v1/policy/decide")
+        self.assertEqual(payload["context"]["tenant"]["id"], "00000000-0000-0000-0000-000000000001")
+        self.assertEqual(payload["context"]["user"]["id"], "user-1")
+        self.assertEqual(payload["context"]["user"]["email"], "user@example.com")
+        self.assertEqual(payload["context"]["user"]["roles"], ["tenant_admin"])
+        self.assertEqual(payload["context"]["request"]["ip_address"], "203.0.113.10")
 
 
 if __name__ == "__main__":

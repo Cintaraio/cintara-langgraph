@@ -8,6 +8,18 @@ import httpx
 from .models import CintaraDecision, CintaraToolCall
 
 
+def _list_from_context(value: Any) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, list):
+        return [str(item) for item in value]
+    if isinstance(value, (tuple, set)):
+        return [str(item) for item in value]
+    return []
+
+
 class CintaraClient:
     """Small HTTP client for the Cintara Trust Control Plane API."""
 
@@ -18,7 +30,12 @@ class CintaraClient:
         tenant_id: str | None = None,
         timeout: float = 10.0,
     ) -> None:
-        self.base_url = (base_url or os.getenv("CINTARA_BASE_URL") or "").rstrip("/")
+        self.base_url = (
+            base_url
+            or os.getenv("CINTARA_POLICY_URL")
+            or os.getenv("CINTARA_BASE_URL")
+            or ""
+        ).rstrip("/")
         self.token = token or os.getenv("CINTARA_API_TOKEN")
         self.tenant_id = tenant_id or os.getenv("CINTARA_TENANT_ID")
         self.timeout = timeout
@@ -44,6 +61,32 @@ class CintaraClient:
             "Accept": "application/json",
         }
 
+    def build_request_context(
+        self,
+        *,
+        user_id: str,
+        session_context: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        context = session_context or {}
+        return {
+            "user": {
+                "id": user_id,
+                "email": str(context.get("user_email") or context.get("email") or ""),
+                "roles": _list_from_context(context.get("user_roles") or context.get("roles")),
+                "privileges": _list_from_context(
+                    context.get("user_privileges") or context.get("privileges")
+                ),
+            },
+            "tenant": {
+                "id": self.tenant_id,
+            },
+            "request": {
+                "ip_address": str(context.get("request_ip") or context.get("ip_address") or ""),
+                "user_agent": str(context.get("user_agent") or ""),
+            },
+            "context_version": "v1",
+        }
+
     def decide(
         self,
         *,
@@ -59,11 +102,18 @@ class CintaraClient:
             "agent_id": agent_id,
             "tenant_id": self.tenant_id,
             "user_id": user_id,
+            "user_email": str((session_context or {}).get("user_email") or ""),
+            "user_roles": _list_from_context((session_context or {}).get("user_roles")),
+            "request_ip": str((session_context or {}).get("request_ip") or ""),
             "operation_type": operation_type,
             "agent_group": agent_group,
             "tool_name": tool_call.name,
             "tool_risk_tier": tool_risk_tier,
             "parameters": tool_call.args,
+            "context": self.build_request_context(
+                user_id=user_id,
+                session_context=session_context,
+            ),
             "session_context": session_context or {},
         }
 

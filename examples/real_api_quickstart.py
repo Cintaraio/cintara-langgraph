@@ -10,7 +10,9 @@ from typing_extensions import TypedDict
 from cintara_langgraph import CintaraGuard
 
 
-BASE_URL = os.environ["CINTARA_BASE_URL"].rstrip("/")
+BASE_URL = os.getenv("CINTARA_BASE_URL", "").rstrip("/")
+POLICY_URL = os.getenv("CINTARA_POLICY_URL", BASE_URL).rstrip("/")
+REGISTRY_URL = os.getenv("CINTARA_REGISTRY_URL", BASE_URL).rstrip("/")
 TOKEN = os.environ["CINTARA_API_TOKEN"]
 AGENT_ID = os.getenv("CINTARA_DEMO_AGENT_ID", "agent-demo-langgraph")
 TOOL_NAME = os.getenv("CINTARA_DEMO_TOOL_NAME", "send_email")
@@ -25,10 +27,18 @@ class DemoState(TypedDict, total=False):
     tool_result: dict[str, Any]
 
 
-def api_base() -> str:
-    if BASE_URL.endswith("/api/v1"):
-        return BASE_URL
-    return f"{BASE_URL}/api/v1"
+def api_base(base_url: str) -> str:
+    if base_url.endswith("/api/v1"):
+        return base_url
+    return f"{base_url}/api/v1"
+
+
+def registry_api_base() -> str:
+    return api_base(REGISTRY_URL)
+
+
+def policy_api_base() -> str:
+    return api_base(POLICY_URL)
 
 
 def headers() -> dict[str, str]:
@@ -40,7 +50,7 @@ def headers() -> dict[str, str]:
 
 
 def create_or_reuse_agent(client: httpx.Client) -> None:
-    response = client.get(f"{api_base()}/agents/", params={"search": AGENT_ID}, headers=headers())
+    response = client.get(f"{registry_api_base()}/agents/", params={"search": AGENT_ID}, headers=headers())
     response.raise_for_status()
     for agent in response.json():
         if agent["name"] == AGENT_ID and agent.get("is_active", True):
@@ -48,7 +58,7 @@ def create_or_reuse_agent(client: httpx.Client) -> None:
             return
 
     response = client.post(
-        f"{api_base()}/agents/",
+        f"{registry_api_base()}/agents/",
         headers=headers(),
         json={
             "name": AGENT_ID,
@@ -61,7 +71,7 @@ def create_or_reuse_agent(client: httpx.Client) -> None:
 
 
 def create_or_reuse_tool(client: httpx.Client) -> str:
-    response = client.get(f"{api_base()}/tools/", params={"search": TOOL_NAME}, headers=headers())
+    response = client.get(f"{registry_api_base()}/tools/", params={"search": TOOL_NAME}, headers=headers())
     response.raise_for_status()
     for tool in response.json():
         if tool["name"] == TOOL_NAME and tool.get("enabled", True):
@@ -69,7 +79,7 @@ def create_or_reuse_tool(client: httpx.Client) -> str:
             return tool["tool_id"]
 
     response = client.post(
-        f"{api_base()}/tools/",
+        f"{registry_api_base()}/tools/",
         headers=headers(),
         json={
             "name": TOOL_NAME,
@@ -102,7 +112,7 @@ def create_or_reuse_tool(client: httpx.Client) -> str:
 
 def create_or_update_policy(client: httpx.Client, tool_id: str) -> None:
     response = client.put(
-        f"{api_base()}/policies/tool/{tool_id}",
+        f"{policy_api_base()}/policies/tool/{tool_id}",
         headers=headers(),
         json={
             "name": "LangGraph demo approval gate",
@@ -160,6 +170,11 @@ def build_graph():
 
 
 def main() -> None:
+    if not POLICY_URL or not REGISTRY_URL:
+        raise RuntimeError(
+            "Set CINTARA_BASE_URL or both CINTARA_POLICY_URL and CINTARA_REGISTRY_URL."
+        )
+
     with httpx.Client(timeout=15.0) as client:
         create_or_reuse_agent(client)
         tool_id = create_or_reuse_tool(client)
@@ -180,6 +195,9 @@ def main() -> None:
             "tool_risk_tier": "WRITE",
             "session_context": {
                 "demo": "real_api_quickstart",
+                "user_email": "langgraph-quickstart@example.com",
+                "user_roles": ["tenant_admin"],
+                "user_privileges": ["PAGE_POLICIES_VIEW"],
             },
         }
     )
