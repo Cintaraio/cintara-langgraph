@@ -146,6 +146,7 @@ INDEX_HTML = """<!doctype html>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Cintara LangGraph Demo</title>
+    <link rel="icon" type="image/png" href="https://apps.cintara.io/govexec-pilot/cintara-logo.png" />
     <style>
       :root {
         color-scheme: light;
