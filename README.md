@@ -36,6 +36,12 @@ Install from GitHub:
 python3 -m pip install "git+https://github.com/Cintaraio/cintara-langgraph.git"
 ```
 
+Install from GitHub with LangGraph example dependencies:
+
+```bash
+python3 -m pip install "cintara-langgraph[langgraph] @ git+https://github.com/Cintaraio/cintara-langgraph.git"
+```
+
 For LangGraph interrupt support:
 
 ```bash
@@ -51,6 +57,41 @@ export CINTARA_TENANT_ID="..."
 ```
 
 `agent_id` is the only value application code normally needs to pass directly. Base URL, token, and tenant can come from environment configuration.
+
+## 5-Minute Real API Quickstart
+
+Install with LangGraph support:
+
+```bash
+python3 -m pip install -e ".[langgraph]"
+```
+
+Set your Cintara API configuration:
+
+```bash
+export CINTARA_BASE_URL="http://localhost:8000"
+export CINTARA_API_TOKEN="..."
+export CINTARA_TENANT_ID="..."
+```
+
+Run the real API quickstart:
+
+```bash
+python3 examples/real_api_quickstart.py
+```
+
+The script uses the Cintara API to:
+
+- create or reuse `agent-demo-langgraph`
+- create or reuse a mock `send_email` governed tool
+- add a policy requiring approval for external or high-value sends
+- run a LangGraph workflow with Cintara as the pre-tool guard step
+
+For a customer demo, the important line is still just:
+
+```python
+cintara = CintaraGuard(agent_id="agent-demo-langgraph")
+```
 
 ## Expected State Shape
 
