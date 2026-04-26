@@ -93,6 +93,16 @@ For a customer demo, the important line is still just:
 cintara = CintaraGuard(agent_id="agent-demo-langgraph")
 ```
 
+## Local Smoke Test
+
+To verify LangGraph wiring without Cintara API credentials:
+
+```bash
+python3 examples/offline_smoke.py
+```
+
+This compiles a real LangGraph graph, calls `CintaraGuard`, routes through `allow`, and executes the mock tool node.
+
 ## Expected State Shape
 
 The simplest explicit state shape is:
