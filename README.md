@@ -1,0 +1,120 @@
+# Cintara LangGraph Integration
+
+Tiny LangGraph integration for placing Cintara as one trust-control step before a tool executes.
+
+The goal is deliberately simple:
+
+```python
+from cintara_langgraph import CintaraGuard
+
+cintara = CintaraGuard(agent_id="agent-prod-001")
+builder.add_node("cintara", cintara.node)
+builder.add_conditional_edges(
+    "cintara",
+    cintara.route,
+    {
+        "allow": "tools",
+        "approval": "human_review",
+        "deny": "__end__",
+        "error": "__end__",
+    },
+)
+```
+
+The node reads a pending tool call from graph state, sends it to Cintara, and writes a compact decision back into state.
+
+## Install Locally
+
+```bash
+cd cintara-langgraph
+python3 -m pip install -e .
+```
+
+Install from GitHub:
+
+```bash
+python3 -m pip install "git+https://github.com/Cintaraio/cintara-langgraph.git"
+```
+
+For LangGraph interrupt support:
+
+```bash
+python3 -m pip install -e ".[langgraph]"
+```
+
+## Environment
+
+```bash
+export CINTARA_BASE_URL="https://api.cintara.io"
+export CINTARA_API_TOKEN="..."
+export CINTARA_TENANT_ID="..."
+```
+
+`agent_id` is the only value application code normally needs to pass directly. Base URL, token, and tenant can come from environment configuration.
+
+## Expected State Shape
+
+The simplest explicit state shape is:
+
+```python
+state = {
+    "tool_call": {
+        "name": "send_email",
+        "args": {"to_email": "customer@example.com", "body": "Hello"},
+        "id": "call_123",
+    },
+    "user_id": "user_123",
+    "session_context": {"thread_id": "thread_123"},
+}
+```
+
+The node also understands the common LangChain message format where the latest AI message has `tool_calls`.
+
+## Output State
+
+The node returns a partial state update:
+
+```python
+{
+    "cintara": {
+        "allowed": True,
+        "route": "allow",
+        "action": "ALLOW",
+        "reason": "No conditions matched - ALLOW",
+        "request_id": "req_...",
+        "decision": {...},
+        "tool_call": {...},
+    }
+}
+```
+
+Routes:
+
+- `allow`: continue to tool execution
+- `approval`: route to a human review node or use LangGraph interrupt mode
+- `deny`: stop execution
+- `error`: fail closed by default
+
+## Approval Interrupts
+
+If you want LangGraph-native human approval, enable interrupts:
+
+```python
+cintara = CintaraGuard(
+    agent_id="agent-prod-001",
+    interrupt_on_approval=True,
+)
+```
+
+When Cintara returns `APPROVAL_REQUIRED`, the node pauses with `langgraph.types.interrupt`. Resuming with `{"approved": true}` lets the graph continue; any other resume payload denies the tool call.
+
+## Why This Shape
+
+The current Cintara gateway already has the right production surface:
+
+- `POST /api/v1/policy/decide`
+- `POST /api/v1/invoke/`
+- `GET /api/v1/invoke/{request_id}/result`
+- approvals and audit services behind the gateway
+
+This integration starts with `policy/decide` because it is the smallest, easiest insertion point in a LangGraph workflow: one pre-tool guard node.
