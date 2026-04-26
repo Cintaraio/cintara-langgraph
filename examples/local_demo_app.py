@@ -414,7 +414,7 @@ INDEX_HTML = """<!doctype html>
         result.textContent = "Running...";
         steps.innerHTML = "";
         const body = Object.fromEntries(new FormData(form).entries());
-        const response = await fetch("/api/run", {
+        const response = await fetch("api/run", {
           method: "POST",
           headers: {"Content-Type": "application/json"},
           body: JSON.stringify(body),
