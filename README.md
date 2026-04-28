@@ -30,6 +30,38 @@ cd cintara-langgraph
 python3 -m pip install -e .
 ```
 
+## Zero-Doc Onboarding
+
+For developers who want the fastest path, run the installer script from a
+LangGraph project directory:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Cintaraio/cintara-langgraph/main/scripts/install-langgraph.sh | bash -s -- \
+  --agent-id "<agent-id>" \
+  --tenant-id "<tenant-id>" \
+  --policy-url "https://platform.cintara.io/policy" \
+  --registry-url "https://platform.cintara.io/registry" \
+  --gateway-url "https://gateway.cintara.io"
+```
+
+The script installs the package, prompts locally for the server-side Cintara
+API token, creates `.env.cintara`, creates `cintara_guard.py`, and creates
+`cintara_smoke_test.py`.
+
+After installation:
+
+```bash
+source .env.cintara
+cintara-langgraph test
+```
+
+You can also run the initializer directly:
+
+```bash
+python3 -m cintara_langgraph init --agent-id "<agent-id>" --tenant-id "<tenant-id>"
+cintara-langgraph init --help
+```
+
 Install from GitHub:
 
 ```bash

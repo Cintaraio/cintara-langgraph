@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from cintara_langgraph import CintaraClient, CintaraDecision, CintaraGuard, CintaraToolCall, extract_tool_call
+from cintara_langgraph.cli import InitConfig, load_env_file, write_init_files
 
 
 class FakeClient:
@@ -204,6 +207,49 @@ class CintaraGuardTests(unittest.TestCase):
 
         self.assertEqual(fake_http.calls[0]["url"], "https://gateway.example.com/api/v1/invoke/")
         self.assertEqual(fake_http.calls[1]["url"], "https://gateway.example.com/api/v1/invoke/req_1/result")
+
+    def test_cli_writes_onboarding_files(self):
+        config = InitConfig(
+            agent_id="agent-1",
+            tenant_id="tenant-1",
+            policy_url="https://platform.cintara.io/policy",
+            registry_url="https://platform.cintara.io/registry",
+            gateway_url="https://gateway.cintara.io",
+            api_token="token with spaces",
+            tool_name="send_email",
+        )
+
+        with TemporaryDirectory() as tmp:
+            project_dir = Path(tmp)
+            written = write_init_files(project_dir, config)
+
+            self.assertEqual(
+                {path.name for path in written},
+                {".env.cintara", "cintara_guard.py", "cintara_smoke_test.py"},
+            )
+            env_values = load_env_file(project_dir / ".env.cintara")
+
+        self.assertEqual(env_values["CINTARA_AGENT_ID"], "agent-1")
+        self.assertEqual(env_values["CINTARA_TENANT_ID"], "tenant-1")
+        self.assertEqual(env_values["CINTARA_API_TOKEN"], "token with spaces")
+
+    def test_cli_does_not_overwrite_existing_files_by_default(self):
+        config = InitConfig(
+            agent_id="agent-1",
+            tenant_id="tenant-1",
+            policy_url="https://platform.cintara.io/policy",
+            registry_url="https://platform.cintara.io/registry",
+            gateway_url="https://gateway.cintara.io",
+            api_token="token-1",
+        )
+
+        with TemporaryDirectory() as tmp:
+            project_dir = Path(tmp)
+            env_file = project_dir / ".env.cintara"
+            env_file.write_text("custom", encoding="utf-8")
+            write_init_files(project_dir, config)
+
+            self.assertEqual(env_file.read_text(encoding="utf-8"), "custom")
 
 
 if __name__ == "__main__":
