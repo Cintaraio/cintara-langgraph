@@ -30,6 +30,38 @@ cd cintara-langgraph
 python3 -m pip install -e .
 ```
 
+## Zero-Doc Onboarding
+
+For developers who want the fastest path, run the installer script from a
+LangGraph project directory:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Cintaraio/cintara-langgraph/main/scripts/install | bash -s -- \
+  --agent-id "<agent-id>" \
+  --tenant-id "<tenant-id>" \
+  --policy-url "https://platform.cintara.io/policy" \
+  --registry-url "https://platform.cintara.io/registry" \
+  --gateway-url "https://gateway.cintara.io"
+```
+
+The script installs the package, prompts locally for the server-side Cintara
+API token, creates `.env.cintara`, creates `cintara_guard.py`, and creates
+`cintara_smoke_test.py`.
+
+After installation:
+
+```bash
+source .env.cintara
+cintara-langgraph test
+```
+
+You can also run the initializer directly:
+
+```bash
+python3 -m cintara_langgraph init --agent-id "<agent-id>" --tenant-id "<tenant-id>"
+cintara-langgraph init --help
+```
+
 Install from GitHub:
 
 ```bash
@@ -62,10 +94,11 @@ For split-service deployments, point the guard at the public Policy service:
 
 ```bash
 export CINTARA_POLICY_URL="https://policy.example.com"
+export CINTARA_GATEWAY_URL="https://gateway.example.com"
 export CINTARA_REGISTRY_URL="https://registry.example.com"
 ```
 
-`CINTARA_POLICY_URL` takes precedence over `CINTARA_BASE_URL` for policy decisions. `CINTARA_REGISTRY_URL` is used only by the real API quickstart to create demo agents and tools.
+`CINTARA_POLICY_URL` takes precedence over `CINTARA_BASE_URL` for policy decisions. `CINTARA_GATEWAY_URL` is used by the optional invoke pipeline helpers (`invoke()` and `poll()`). `CINTARA_REGISTRY_URL` is used only by the real API quickstart to create demo agents and tools.
 
 ## 5-Minute Real API Quickstart
 
@@ -80,6 +113,7 @@ Set your Cintara API configuration:
 ```bash
 export CINTARA_BASE_URL="http://localhost:8000"
 export CINTARA_POLICY_URL="http://localhost:8003"
+export CINTARA_GATEWAY_URL="http://localhost:8002"
 export CINTARA_REGISTRY_URL="http://localhost:8004"
 export CINTARA_API_TOKEN="..."
 export CINTARA_TENANT_ID="..."
