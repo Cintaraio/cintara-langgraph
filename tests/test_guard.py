@@ -48,6 +48,10 @@ class FakeHTTPClient:
         self.calls.append({"url": url, "headers": headers, "json": json})
         return FakeResponse()
 
+    def get(self, url, headers):
+        self.calls.append({"url": url, "headers": headers})
+        return FakeResponse()
+
 
 class CintaraGuardTests(unittest.TestCase):
     def test_extracts_explicit_tool_call(self):
@@ -180,6 +184,26 @@ class CintaraGuardTests(unittest.TestCase):
         self.assertEqual(payload["context"]["user"]["email"], "user@example.com")
         self.assertEqual(payload["context"]["user"]["roles"], ["tenant_admin"])
         self.assertEqual(payload["context"]["request"]["ip_address"], "203.0.113.10")
+
+    def test_client_uses_gateway_url_for_invoke_pipeline(self):
+        fake_http = FakeHTTPClient(timeout=10.0)
+
+        with patch("cintara_langgraph.client.httpx.Client", return_value=fake_http):
+            client = CintaraClient(
+                policy_url="https://policy.example.com",
+                gateway_url="https://gateway.example.com",
+                token="token-1",
+                tenant_id="00000000-0000-0000-0000-000000000001",
+            )
+            client.invoke(
+                agent_id="agent-1",
+                tool_call=CintaraToolCall(name="send_email", args={"body": "hello"}),
+                user_id="user-1",
+            )
+            client.poll("req_1")
+
+        self.assertEqual(fake_http.calls[0]["url"], "https://gateway.example.com/api/v1/invoke/")
+        self.assertEqual(fake_http.calls[1]["url"], "https://gateway.example.com/api/v1/invoke/req_1/result")
 
 
 if __name__ == "__main__":

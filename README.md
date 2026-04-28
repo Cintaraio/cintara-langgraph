@@ -62,10 +62,11 @@ For split-service deployments, point the guard at the public Policy service:
 
 ```bash
 export CINTARA_POLICY_URL="https://policy.example.com"
+export CINTARA_GATEWAY_URL="https://gateway.example.com"
 export CINTARA_REGISTRY_URL="https://registry.example.com"
 ```
 
-`CINTARA_POLICY_URL` takes precedence over `CINTARA_BASE_URL` for policy decisions. `CINTARA_REGISTRY_URL` is used only by the real API quickstart to create demo agents and tools.
+`CINTARA_POLICY_URL` takes precedence over `CINTARA_BASE_URL` for policy decisions. `CINTARA_GATEWAY_URL` is used by the optional invoke pipeline helpers (`invoke()` and `poll()`). `CINTARA_REGISTRY_URL` is used only by the real API quickstart to create demo agents and tools.
 
 ## 5-Minute Real API Quickstart
 
@@ -80,6 +81,7 @@ Set your Cintara API configuration:
 ```bash
 export CINTARA_BASE_URL="http://localhost:8000"
 export CINTARA_POLICY_URL="http://localhost:8003"
+export CINTARA_GATEWAY_URL="http://localhost:8002"
 export CINTARA_REGISTRY_URL="http://localhost:8004"
 export CINTARA_API_TOKEN="..."
 export CINTARA_TENANT_ID="..."
