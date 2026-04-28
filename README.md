@@ -36,7 +36,7 @@ For developers who want the fastest path, run the installer script from a
 LangGraph project directory:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Cintaraio/cintara-langgraph/main/scripts/install-langgraph.sh | bash -s -- \
+curl -fsSL https://raw.githubusercontent.com/Cintaraio/cintara-langgraph/main/scripts/install | bash -s -- \
   --agent-id "<agent-id>" \
   --tenant-id "<tenant-id>" \
   --policy-url "https://platform.cintara.io/policy" \

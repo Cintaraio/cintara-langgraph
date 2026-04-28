@@ -4,3 +4,5 @@ __pycache__/
 .venv/
 dist/
 *.egg-info/
+docs/~$*.docx
+docs/Cintara LangGraph Internal Engineering Rollout Guide.docx
