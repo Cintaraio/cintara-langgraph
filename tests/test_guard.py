@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from cintara_langgraph import CintaraClient, CintaraDecision, CintaraGuard, CintaraToolCall, extract_tool_call
+from cintara_langgraph.cli import InitConfig, load_env_file, write_init_files
 
 
 class FakeClient:
@@ -46,6 +49,10 @@ class FakeHTTPClient:
 
     def post(self, url, headers, json):
         self.calls.append({"url": url, "headers": headers, "json": json})
+        return FakeResponse()
+
+    def get(self, url, headers):
+        self.calls.append({"url": url, "headers": headers})
         return FakeResponse()
 
 
@@ -180,6 +187,69 @@ class CintaraGuardTests(unittest.TestCase):
         self.assertEqual(payload["context"]["user"]["email"], "user@example.com")
         self.assertEqual(payload["context"]["user"]["roles"], ["tenant_admin"])
         self.assertEqual(payload["context"]["request"]["ip_address"], "203.0.113.10")
+
+    def test_client_uses_gateway_url_for_invoke_pipeline(self):
+        fake_http = FakeHTTPClient(timeout=10.0)
+
+        with patch("cintara_langgraph.client.httpx.Client", return_value=fake_http):
+            client = CintaraClient(
+                policy_url="https://policy.example.com",
+                gateway_url="https://gateway.example.com",
+                token="token-1",
+                tenant_id="00000000-0000-0000-0000-000000000001",
+            )
+            client.invoke(
+                agent_id="agent-1",
+                tool_call=CintaraToolCall(name="send_email", args={"body": "hello"}),
+                user_id="user-1",
+            )
+            client.poll("req_1")
+
+        self.assertEqual(fake_http.calls[0]["url"], "https://gateway.example.com/api/v1/invoke/")
+        self.assertEqual(fake_http.calls[1]["url"], "https://gateway.example.com/api/v1/invoke/req_1/result")
+
+    def test_cli_writes_onboarding_files(self):
+        config = InitConfig(
+            agent_id="agent-1",
+            tenant_id="tenant-1",
+            policy_url="https://platform.cintara.io/policy",
+            registry_url="https://platform.cintara.io/registry",
+            gateway_url="https://gateway.cintara.io",
+            api_token="token with spaces",
+            tool_name="send_email",
+        )
+
+        with TemporaryDirectory() as tmp:
+            project_dir = Path(tmp)
+            written = write_init_files(project_dir, config)
+
+            self.assertEqual(
+                {path.name for path in written},
+                {".env.cintara", "cintara_guard.py", "cintara_smoke_test.py"},
+            )
+            env_values = load_env_file(project_dir / ".env.cintara")
+
+        self.assertEqual(env_values["CINTARA_AGENT_ID"], "agent-1")
+        self.assertEqual(env_values["CINTARA_TENANT_ID"], "tenant-1")
+        self.assertEqual(env_values["CINTARA_API_TOKEN"], "token with spaces")
+
+    def test_cli_does_not_overwrite_existing_files_by_default(self):
+        config = InitConfig(
+            agent_id="agent-1",
+            tenant_id="tenant-1",
+            policy_url="https://platform.cintara.io/policy",
+            registry_url="https://platform.cintara.io/registry",
+            gateway_url="https://gateway.cintara.io",
+            api_token="token-1",
+        )
+
+        with TemporaryDirectory() as tmp:
+            project_dir = Path(tmp)
+            env_file = project_dir / ".env.cintara"
+            env_file.write_text("custom", encoding="utf-8")
+            write_init_files(project_dir, config)
+
+            self.assertEqual(env_file.read_text(encoding="utf-8"), "custom")
 
 
 if __name__ == "__main__":

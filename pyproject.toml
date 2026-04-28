@@ -17,6 +17,9 @@ dev = [
     "pytest",
 ]
 
+[project.scripts]
+cintara-langgraph = "cintara_langgraph.cli:main"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

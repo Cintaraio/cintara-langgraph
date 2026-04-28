@@ -26,15 +26,23 @@ class CintaraClient:
     def __init__(
         self,
         base_url: str | None = None,
+        policy_url: str | None = None,
+        gateway_url: str | None = None,
         token: str | None = None,
         tenant_id: str | None = None,
         timeout: float = 10.0,
     ) -> None:
+        common_base_url = base_url or os.getenv("CINTARA_BASE_URL") or ""
         self.base_url = (
-            base_url
+            policy_url
             or os.getenv("CINTARA_POLICY_URL")
-            or os.getenv("CINTARA_BASE_URL")
-            or ""
+            or common_base_url
+        ).rstrip("/")
+        self.gateway_url = (
+            gateway_url
+            or os.getenv("CINTARA_GATEWAY_URL")
+            or common_base_url
+            or self.base_url
         ).rstrip("/")
         self.token = token or os.getenv("CINTARA_API_TOKEN")
         self.tenant_id = tenant_id or os.getenv("CINTARA_TENANT_ID")
@@ -47,11 +55,23 @@ class CintaraClient:
         if not self.tenant_id:
             raise ValueError("Cintara tenant ID is required. Set CINTARA_TENANT_ID or pass tenant_id.")
 
+    @staticmethod
+    def _api_base(url: str) -> str:
+        if url.endswith("/api/v1"):
+            return url
+        return f"{url}/api/v1"
+
     @property
     def api_base(self) -> str:
-        if self.base_url.endswith("/api/v1"):
-            return self.base_url
-        return f"{self.base_url}/api/v1"
+        return self.policy_api_base
+
+    @property
+    def policy_api_base(self) -> str:
+        return self._api_base(self.base_url)
+
+    @property
+    def gateway_api_base(self) -> str:
+        return self._api_base(self.gateway_url)
 
     @property
     def headers(self) -> dict[str, str]:
@@ -119,7 +139,7 @@ class CintaraClient:
 
         with httpx.Client(timeout=self.timeout) as client:
             response = client.post(
-                f"{self.api_base}/policy/decide",
+                f"{self.policy_api_base}/policy/decide",
                 headers=self.headers,
                 json=payload,
             )
@@ -153,7 +173,7 @@ class CintaraClient:
 
         with httpx.Client(timeout=self.timeout) as client:
             response = client.post(
-                f"{self.api_base}/invoke/",
+                f"{self.gateway_api_base}/invoke/",
                 headers=headers,
                 json=payload,
             )
@@ -163,7 +183,7 @@ class CintaraClient:
     def poll(self, request_id: str) -> dict[str, Any]:
         with httpx.Client(timeout=self.timeout) as client:
             response = client.get(
-                f"{self.api_base}/invoke/{request_id}/result",
+                f"{self.gateway_api_base}/invoke/{request_id}/result",
                 headers=self.headers,
             )
             response.raise_for_status()
