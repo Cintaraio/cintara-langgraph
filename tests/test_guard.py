@@ -7,7 +7,13 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from cintara_langgraph import CintaraClient, CintaraDecision, CintaraGuard, CintaraToolCall, extract_tool_call
-from cintara_langgraph.cli import InitConfig, _collect_self_service_config, load_env_file, write_init_files
+from cintara_langgraph.cli import (
+    InitConfig,
+    _collect_self_service_config,
+    build_powershell_env_file,
+    load_env_file,
+    write_init_files,
+)
 
 
 class FakeClient:
@@ -265,13 +271,29 @@ class CintaraGuardTests(unittest.TestCase):
 
             self.assertEqual(
                 {path.name for path in written},
-                {".env.cintara", "cintara_guard.py", "cintara_smoke_test.py"},
+                {".env.cintara", ".env.cintara.ps1", "cintara_guard.py", "cintara_smoke_test.py"},
             )
             env_values = load_env_file(project_dir / ".env.cintara")
+            powershell_env = (project_dir / ".env.cintara.ps1").read_text(encoding="utf-8")
 
         self.assertEqual(env_values["CINTARA_AGENT_ID"], "agent-1")
         self.assertEqual(env_values["CINTARA_TENANT_ID"], "tenant-1")
         self.assertEqual(env_values["CINTARA_API_TOKEN"], "token with spaces")
+        self.assertIn("$env:CINTARA_API_TOKEN = 'token with spaces'", powershell_env)
+
+    def test_cli_writes_powershell_env_file_with_escaped_values(self):
+        config = InitConfig(
+            agent_id="agent-1",
+            tenant_id="tenant-1",
+            policy_url="https://platform.cintara.io/policy",
+            registry_url="https://platform.cintara.io/registry",
+            gateway_url="https://gateway.cintara.io",
+            api_token="token's value",
+        )
+
+        powershell_env = build_powershell_env_file(config)
+
+        self.assertIn("$env:CINTARA_API_TOKEN = 'token''s value'", powershell_env)
 
     def test_cli_does_not_overwrite_existing_files_by_default(self):
         config = InitConfig(

@@ -42,6 +42,10 @@ def _quote(value: str) -> str:
     return shlex.quote(value)
 
 
+def _ps_quote(value: str) -> str:
+    return "'" + value.replace("'", "''") + "'"
+
+
 def _is_placeholder(value: str) -> bool:
     return not value or value.startswith("<") or value.endswith(">")
 
@@ -69,6 +73,23 @@ def build_env_file(config: InitConfig) -> str:
             f"export CINTARA_TENANT_ID={_quote(config.tenant_id)}",
             f"export CINTARA_AGENT_ID={_quote(config.agent_id)}",
             f"export CINTARA_DEMO_TOOL_NAME={_quote(config.tool_name)}",
+            "",
+        ]
+    )
+
+
+def build_powershell_env_file(config: InitConfig) -> str:
+    return "\n".join(
+        [
+            "# Cintara LangGraph configuration",
+            "# Load with: . .\\.env.cintara.ps1",
+            f"$env:CINTARA_POLICY_URL = {_ps_quote(config.policy_url)}",
+            f"$env:CINTARA_REGISTRY_URL = {_ps_quote(config.registry_url)}",
+            f"$env:CINTARA_GATEWAY_URL = {_ps_quote(config.gateway_url)}",
+            f"$env:CINTARA_API_TOKEN = {_ps_quote(config.api_token)}",
+            f"$env:CINTARA_TENANT_ID = {_ps_quote(config.tenant_id)}",
+            f"$env:CINTARA_AGENT_ID = {_ps_quote(config.agent_id)}",
+            f"$env:CINTARA_DEMO_TOOL_NAME = {_ps_quote(config.tool_name)}",
             "",
         ]
     )
@@ -224,6 +245,7 @@ def write_init_files(project_dir: Path, config: InitConfig, *, overwrite: bool =
     project_dir.mkdir(parents=True, exist_ok=True)
     files = {
         ".env.cintara": build_env_file(config),
+        ".env.cintara.ps1": build_powershell_env_file(config),
         "cintara_guard.py": build_guard_file(),
         "cintara_smoke_test.py": build_smoke_test_file(),
     }
@@ -408,7 +430,8 @@ def run_init(args: argparse.Namespace) -> int:
         _run_smoke_test(config)
 
     print("\nNext:")
-    print("  source .env.cintara")
+    print("  macOS/Linux: source .env.cintara")
+    print("  Windows PowerShell: . .\\.env.cintara.ps1")
     print("  cintara-langgraph test")
     print("  import add_cintara_guard from cintara_guard.py in your LangGraph workflow")
     return 0

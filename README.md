@@ -35,10 +35,21 @@ python3 -m pip install -e .
 For developers who want the fastest path, run the installer script from a
 LangGraph project directory:
 
+macOS, Linux, WSL, or Git Bash:
+
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Cintaraio/cintara-langgraph/main/scripts/install | bash -s -- \
   --onboarding-code "<onboarding-code>" \
   --registry-url "https://platform.cintara.io/registry"
+```
+
+Windows PowerShell:
+
+```powershell
+iwr -UseBasicParsing https://raw.githubusercontent.com/Cintaraio/cintara-langgraph/main/scripts/install.ps1 -OutFile .\install-cintara-langgraph.ps1
+powershell -ExecutionPolicy Bypass -File .\install-cintara-langgraph.ps1 `
+  -OnboardingCode "<onboarding-code>" `
+  -RegistryUrl "https://platform.cintara.io/registry"
 ```
 
 The self-service flow asks for your developer email, sends a verification code,
@@ -46,6 +57,8 @@ then writes a short-lived agent runtime token into `.env.cintara`.
 
 If your Cintara admin gave you explicit values instead of an onboarding code,
 run:
+
+macOS, Linux, WSL, or Git Bash:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Cintaraio/cintara-langgraph/main/scripts/install | bash -s -- \
@@ -56,15 +69,34 @@ curl -fsSL https://raw.githubusercontent.com/Cintaraio/cintara-langgraph/main/sc
   --gateway-url "https://gateway.cintara.io"
 ```
 
+Windows PowerShell:
+
+```powershell
+iwr -UseBasicParsing https://raw.githubusercontent.com/Cintaraio/cintara-langgraph/main/scripts/install.ps1 -OutFile .\install-cintara-langgraph.ps1
+powershell -ExecutionPolicy Bypass -File .\install-cintara-langgraph.ps1 `
+  -AgentId "<agent-id>" `
+  -TenantId "<tenant-id>" `
+  -PolicyUrl "https://platform.cintara.io/policy" `
+  -RegistryUrl "https://platform.cintara.io/registry" `
+  -GatewayUrl "https://gateway.cintara.io"
+```
+
 The script installs the package, prompts locally for any missing values, creates
-`.env.cintara`, creates `cintara_guard.py`, and creates `cintara_smoke_test.py`.
-The preferred path is self-service onboarding. You should not copy a token from
-browser DevTools.
+`.env.cintara`, creates `.env.cintara.ps1` for Windows PowerShell, creates
+`cintara_guard.py`, and creates `cintara_smoke_test.py`. The preferred path is
+self-service onboarding. You should not copy a token from browser DevTools.
 
 After installation:
 
 ```bash
 source .env.cintara
+cintara-langgraph test
+```
+
+On Windows PowerShell:
+
+```powershell
+. .\.env.cintara.ps1
 cintara-langgraph test
 ```
 
