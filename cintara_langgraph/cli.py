@@ -11,6 +11,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Sequence
 
+import httpx
+
 from .client import CintaraClient
 from .graph import CintaraGuard
 
@@ -235,16 +237,93 @@ def write_init_files(project_dir: Path, config: InitConfig, *, overwrite: bool =
     return written
 
 
+def _api_base(url: str) -> str:
+    cleaned = _clean_url(url)
+    if cleaned.endswith("/api/v1"):
+        return cleaned
+    return f"{cleaned}/api/v1"
+
+
+def _response_error_message(response: httpx.Response) -> str:
+    try:
+        detail = response.json().get("detail")
+    except Exception:
+        detail = None
+    if isinstance(detail, str):
+        return detail
+    if detail:
+        return str(detail)
+    return response.text or f"HTTP {response.status_code}"
+
+
+def _collect_self_service_config(args: argparse.Namespace, registry_url: str) -> InitConfig:
+    developer_email = _prompt(
+        "Developer email",
+        args.developer_email or os.environ.get("CINTARA_DEVELOPER_EMAIL"),
+    )
+    if not developer_email:
+        print("Developer email is required when using --onboarding-code.", file=sys.stderr)
+        raise SystemExit(2)
+
+    api_base = _api_base(registry_url)
+    onboarding_code = args.onboarding_code.strip()
+    start_url = f"{api_base}/langgraph/onboarding/{onboarding_code}/start"
+    complete_url = f"{api_base}/langgraph/onboarding/{onboarding_code}/complete"
+
+    try:
+        with httpx.Client(timeout=15.0) as client:
+            start_response = client.post(start_url, json={"developer_email": developer_email})
+            if start_response.status_code >= 400:
+                print(f"Cintara onboarding failed: {_response_error_message(start_response)}", file=sys.stderr)
+                raise SystemExit(2)
+            start_payload = start_response.json()
+            print(
+                "Verification code sent to "
+                f"{start_payload.get('developer_email', developer_email)}."
+            )
+            verification_code = _prompt("Verification code", args.verification_code)
+            if not verification_code:
+                print("Verification code is required to finish onboarding.", file=sys.stderr)
+                raise SystemExit(2)
+            complete_response = client.post(
+                complete_url,
+                json={
+                    "developer_email": developer_email,
+                    "verification_code": verification_code,
+                },
+            )
+            if complete_response.status_code >= 400:
+                print(f"Cintara onboarding failed: {_response_error_message(complete_response)}", file=sys.stderr)
+                raise SystemExit(2)
+            payload = complete_response.json()
+    except httpx.RequestError as exc:
+        print(f"Cintara onboarding failed: {exc}", file=sys.stderr)
+        raise SystemExit(2) from exc
+
+    return InitConfig(
+        agent_id=str(payload["agent_id"]),
+        tenant_id=str(payload["tenant_id"]),
+        policy_url=_clean_url(str(payload["policy_url"])),
+        registry_url=_clean_url(str(payload["registry_url"])),
+        gateway_url=_clean_url(str(payload["gateway_url"])),
+        api_token=str(payload["access_token"]),
+        tool_name=args.tool_name or os.environ.get("CINTARA_DEMO_TOOL_NAME") or DEFAULT_TOOL_NAME,
+    )
+
+
 def _collect_config(args: argparse.Namespace) -> InitConfig:
     env = os.environ
     policy_url = _clean_url(args.policy_url or env.get("CINTARA_POLICY_URL") or DEFAULT_POLICY_URL)
     registry_url = _clean_url(args.registry_url or env.get("CINTARA_REGISTRY_URL") or DEFAULT_REGISTRY_URL)
     gateway_url = _clean_url(args.gateway_url or env.get("CINTARA_GATEWAY_URL") or DEFAULT_GATEWAY_URL)
 
+    if args.onboarding_code:
+        return _collect_self_service_config(args, registry_url)
+
     agent_id = _prompt("Cintara agent id", args.agent_id or env.get("CINTARA_AGENT_ID"))
     tenant_id = _prompt("Cintara tenant id", args.tenant_id or env.get("CINTARA_TENANT_ID"))
     api_token = _prompt(
-        "Cintara API token or tenant JWT",
+        "Cintara runtime token from your admin",
         args.api_token or env.get("CINTARA_API_TOKEN"),
         secret=True,
     )
@@ -254,7 +333,7 @@ def _collect_config(args: argparse.Namespace) -> InitConfig:
     if not tenant_id:
         tenant_id = "<tenant-id>"
     if not api_token:
-        api_token = "<server-side-token>"
+        api_token = "<cintara-runtime-token>"
 
     return InitConfig(
         agent_id=agent_id,
@@ -270,6 +349,7 @@ def _collect_config(args: argparse.Namespace) -> InitConfig:
 def _run_smoke_test(config: InitConfig) -> int:
     if _is_placeholder(config.api_token) or _is_placeholder(config.agent_id) or _is_placeholder(config.tenant_id):
         print("Skipping smoke test because one or more required values are placeholders.")
+        print("Ask your Cintara admin for a generated LangGraph setup command or runtime token.")
         return 0
 
     try:
@@ -401,6 +481,9 @@ def build_parser() -> argparse.ArgumentParser:
     init_parser.add_argument("--registry-url")
     init_parser.add_argument("--gateway-url")
     init_parser.add_argument("--api-token")
+    init_parser.add_argument("--onboarding-code")
+    init_parser.add_argument("--developer-email")
+    init_parser.add_argument("--verification-code")
     init_parser.add_argument("--tool-name", default=DEFAULT_TOOL_NAME)
     init_parser.add_argument("--project-dir", default=".")
     init_parser.add_argument("--overwrite", action="store_true")
