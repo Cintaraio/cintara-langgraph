@@ -37,6 +37,18 @@ LangGraph project directory:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Cintaraio/cintara-langgraph/main/scripts/install | bash -s -- \
+  --onboarding-code "<onboarding-code>" \
+  --registry-url "https://platform.cintara.io/registry"
+```
+
+The self-service flow asks for your developer email, sends a verification code,
+then writes a short-lived agent runtime token into `.env.cintara`.
+
+If your Cintara admin gave you explicit values instead of an onboarding code,
+run:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Cintaraio/cintara-langgraph/main/scripts/install | bash -s -- \
   --agent-id "<agent-id>" \
   --tenant-id "<tenant-id>" \
   --policy-url "https://platform.cintara.io/policy" \
@@ -44,12 +56,9 @@ curl -fsSL https://raw.githubusercontent.com/Cintaraio/cintara-langgraph/main/sc
   --gateway-url "https://gateway.cintara.io"
 ```
 
-The script installs the package, prompts locally for the Cintara runtime token
-when one was not already included, creates `.env.cintara`, creates
-`cintara_guard.py`, and creates `cintara_smoke_test.py`. The preferred path is
-to use the setup command sent by Cintara email invite. If your organization uses
-a separate approved secret-sharing channel, ask your Cintara admin for a
-generated setup command or runtime token. You should not copy a token from
+The script installs the package, prompts locally for any missing values, creates
+`.env.cintara`, creates `cintara_guard.py`, and creates `cintara_smoke_test.py`.
+The preferred path is self-service onboarding. You should not copy a token from
 browser DevTools.
 
 After installation:
