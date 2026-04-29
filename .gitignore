@@ -2,6 +2,8 @@ __pycache__/
 *.pyc
 .pytest_cache/
 .venv/
+.env.cintara
+.env.cintara.ps1
 dist/
 *.egg-info/
 docs/~$*.docx
