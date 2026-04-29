@@ -45,8 +45,9 @@ curl -fsSL https://raw.githubusercontent.com/Cintaraio/cintara-langgraph/main/sc
 ```
 
 The script installs the package, prompts locally for the server-side Cintara
-API token, creates `.env.cintara`, creates `cintara_guard.py`, and creates
-`cintara_smoke_test.py`.
+runtime token, creates `.env.cintara`, creates `cintara_guard.py`, and creates
+`cintara_smoke_test.py`. Ask your Cintara admin for the generated setup command
+or runtime token. You should not copy a token from browser DevTools.
 
 After installation:
 
@@ -84,7 +85,7 @@ python3 -m pip install -e ".[langgraph]"
 
 ```bash
 export CINTARA_BASE_URL="https://api.cintara.io"
-export CINTARA_API_TOKEN="..."
+export CINTARA_API_TOKEN="<cintara-runtime-token>"
 export CINTARA_TENANT_ID="..."
 ```
 

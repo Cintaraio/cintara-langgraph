@@ -244,7 +244,7 @@ def _collect_config(args: argparse.Namespace) -> InitConfig:
     agent_id = _prompt("Cintara agent id", args.agent_id or env.get("CINTARA_AGENT_ID"))
     tenant_id = _prompt("Cintara tenant id", args.tenant_id or env.get("CINTARA_TENANT_ID"))
     api_token = _prompt(
-        "Cintara API token or tenant JWT",
+        "Cintara runtime token from your admin",
         args.api_token or env.get("CINTARA_API_TOKEN"),
         secret=True,
     )
@@ -254,7 +254,7 @@ def _collect_config(args: argparse.Namespace) -> InitConfig:
     if not tenant_id:
         tenant_id = "<tenant-id>"
     if not api_token:
-        api_token = "<server-side-token>"
+        api_token = "<cintara-runtime-token>"
 
     return InitConfig(
         agent_id=agent_id,
@@ -270,6 +270,7 @@ def _collect_config(args: argparse.Namespace) -> InitConfig:
 def _run_smoke_test(config: InitConfig) -> int:
     if _is_placeholder(config.api_token) or _is_placeholder(config.agent_id) or _is_placeholder(config.tenant_id):
         print("Skipping smoke test because one or more required values are placeholders.")
+        print("Ask your Cintara admin for a generated LangGraph setup command or runtime token.")
         return 0
 
     try:
