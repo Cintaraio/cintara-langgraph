@@ -44,10 +44,13 @@ curl -fsSL https://raw.githubusercontent.com/Cintaraio/cintara-langgraph/main/sc
   --gateway-url "https://gateway.cintara.io"
 ```
 
-The script installs the package, prompts locally for the server-side Cintara
-runtime token, creates `.env.cintara`, creates `cintara_guard.py`, and creates
-`cintara_smoke_test.py`. Ask your Cintara admin for the generated setup command
-or runtime token. You should not copy a token from browser DevTools.
+The script installs the package, prompts locally for the Cintara runtime token
+when one was not already included, creates `.env.cintara`, creates
+`cintara_guard.py`, and creates `cintara_smoke_test.py`. The preferred path is
+to use the setup command sent by Cintara email invite. If your organization uses
+a separate approved secret-sharing channel, ask your Cintara admin for a
+generated setup command or runtime token. You should not copy a token from
+browser DevTools.
 
 After installation:
 
