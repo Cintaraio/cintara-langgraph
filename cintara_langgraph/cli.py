@@ -267,10 +267,22 @@ def _api_base(url: str) -> str:
 
 
 def _response_error_message(response: httpx.Response) -> str:
+    status_code = getattr(response, "status_code", None)
     try:
-        detail = response.json().get("detail")
+        payload = response.json()
+        detail = payload.get("detail") if isinstance(payload, dict) else None
     except Exception:
         detail = None
+
+    if isinstance(status_code, int) and status_code >= 500:
+        if isinstance(detail, str) and detail and detail != "Internal Server Error":
+            return f"{detail} (HTTP {status_code})"
+        return (
+            f"Cintara onboarding service is temporarily unavailable "
+            f"(HTTP {status_code}). Please ask your Cintara contact to check "
+            "the LangGraph onboarding service."
+        )
+
     if isinstance(detail, str):
         return detail
     if detail:

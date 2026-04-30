@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import unittest
+from contextlib import redirect_stderr
+from io import StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
@@ -10,6 +12,7 @@ from cintara_langgraph import CintaraClient, CintaraDecision, CintaraGuard, Cint
 from cintara_langgraph.cli import (
     InitConfig,
     _collect_self_service_config,
+    _response_error_message,
     build_powershell_env_file,
     load_env_file,
     write_init_files,
@@ -100,6 +103,20 @@ class FakeOnboardingHTTPClient:
                 "scope": ["policy:decide"],
             },
         )
+
+
+class FailingOnboardingHTTPClient:
+    def __init__(self, timeout):
+        self.timeout = timeout
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
+
+    def post(self, url, json):
+        return FakeOnboardingResponse(500, {"detail": "Internal Server Error"})
 
 
 class CintaraGuardTests(unittest.TestCase):
@@ -335,6 +352,39 @@ class CintaraGuardTests(unittest.TestCase):
         self.assertEqual(
             fake_http.calls[1]["url"],
             "https://registry.example.com/api/v1/langgraph/onboarding/onboard_123/complete",
+        )
+
+    def test_cli_self_service_onboarding_hides_raw_internal_server_error(self):
+        args = SimpleNamespace(
+            onboarding_code="onboard_123",
+            developer_email="dev@example.com",
+            verification_code="123456",
+            tool_name="send_email",
+        )
+        stderr = StringIO()
+
+        with patch(
+            "cintara_langgraph.cli.httpx.Client",
+            return_value=FailingOnboardingHTTPClient(timeout=15.0),
+        ):
+            with redirect_stderr(stderr):
+                with self.assertRaises(SystemExit):
+                    _collect_self_service_config(args, "https://registry.example.com")
+
+        output = stderr.getvalue()
+        self.assertIn("temporarily unavailable", output)
+        self.assertIn("LangGraph onboarding service", output)
+        self.assertNotIn("Internal Server Error", output)
+
+    def test_response_error_message_uses_backend_detail_for_503(self):
+        response = FakeOnboardingResponse(
+            503,
+            {"detail": "Verification email could not be sent"},
+        )
+
+        self.assertEqual(
+            _response_error_message(response),
+            "Verification email could not be sent (HTTP 503)",
         )
 
 
