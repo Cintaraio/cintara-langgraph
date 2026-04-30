@@ -26,7 +26,10 @@ python -m pip install "$PACKAGE_SPEC"
 
 echo
 echo "Initializing Cintara LangGraph onboarding files..."
-if [ -r /dev/tty ]; then
+
+if [ -t 0 ]; then
+  python -m cintara_langgraph init "$@"
+elif [ -r /dev/tty ] && { true < /dev/tty; } 2>/dev/null; then
   python -m cintara_langgraph init "$@" < /dev/tty
 else
   python -m cintara_langgraph init "$@"
