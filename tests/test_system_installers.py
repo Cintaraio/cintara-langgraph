@@ -87,6 +87,95 @@ class InstallerSystemContractTests(unittest.TestCase):
             self.assertIn("-m pip install", calls)
             self.assertIn("-m cintara_langgraph init --agent-id agent-1", calls)
 
+    def test_bash_installer_auto_detects_versioned_python_when_python3_is_old(self):
+        _skip_bash_on_windows()
+        if not shutil.which("bash"):
+            self.skipTest("bash is not available")
+
+        installer = ROOT / "scripts" / "install"
+        with TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            calls_file = tmp_path / "calls.txt"
+
+            for name in ["python3.13", "python3.12", "python3", "python"]:
+                fake_old_python = tmp_path / name
+                fake_old_python.write_text(
+                    "\n".join(
+                        [
+                            "#!/usr/bin/env bash",
+                            "set -euo pipefail",
+                            f"printf '%s %s\\n' {name} \"$*\" >> {calls_file}",
+                            "if [ \"${1:-}\" = '-c' ]; then exit 1; fi",
+                            "exit 0",
+                            "",
+                        ]
+                    ),
+                    encoding="utf-8",
+                )
+                fake_old_python.chmod(0o755)
+
+            fake_python_311 = tmp_path / "python3.11"
+            fake_python_311.write_text(
+                "\n".join(
+                    [
+                        "#!/usr/bin/env bash",
+                        "set -euo pipefail",
+                        f"printf '%s %s\\n' python3.11 \"$*\" >> {calls_file}",
+                        "if [ \"${1:-}\" = '-c' ]; then exit 0; fi",
+                        "exit 0",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            fake_python_311.chmod(0o755)
+
+            venv_bin = tmp_path / ".venv" / "bin"
+            venv_bin.mkdir(parents=True)
+            venv_python = venv_bin / "python"
+            venv_python.write_text(
+                "\n".join(
+                    [
+                        "#!/usr/bin/env bash",
+                        "set -euo pipefail",
+                        f"printf '%s %s\\n' venv-python \"$*\" >> {calls_file}",
+                        "exit 0",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            venv_python.chmod(0o755)
+
+            env = {
+                "PATH": f"{venv_bin}:{tmp_path}:{os.environ.get('PATH', '')}",
+                "VIRTUAL_ENV": str(tmp_path / ".venv"),
+            }
+            result = subprocess.run(
+                [
+                    "bash",
+                    str(installer),
+                    "--agent-id",
+                    "agent-1",
+                    "--tenant-id",
+                    "tenant-1",
+                    "--api-token",
+                    "token-1",
+                    "--skip-smoke-test",
+                ],
+                cwd=tmp_path,
+                env=env,
+                stdin=subprocess.DEVNULL,
+                text=True,
+                capture_output=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            calls = calls_file.read_text(encoding="utf-8")
+            self.assertIn("python3.11 -c", calls)
+            self.assertIn("venv-python -m pip install", calls)
+            self.assertIn("venv-python -m cintara_langgraph init --agent-id agent-1", calls)
+
     def test_powershell_installer_wires_self_service_and_manual_onboarding(self):
         installer = ROOT / "scripts" / "install.ps1"
         self.assertTrue(installer.exists())
