@@ -4,6 +4,7 @@ import shutil
 import subprocess
 import unittest
 import os
+import sys
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -11,11 +12,18 @@ from tempfile import TemporaryDirectory
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def _skip_bash_on_windows() -> None:
+    """Windows runners can expose a bash shim that requires unavailable WSL."""
+    if sys.platform.startswith("win"):
+        raise unittest.SkipTest("Bash installer is covered on Unix runners")
+
+
 class InstallerSystemContractTests(unittest.TestCase):
     def test_bash_installer_has_valid_syntax_and_public_package_source(self):
         installer = ROOT / "scripts" / "install"
         self.assertTrue(installer.exists())
 
+        _skip_bash_on_windows()
         if shutil.which("bash"):
             subprocess.run(["bash", "-n", str(installer)], check=True)
 
@@ -26,6 +34,7 @@ class InstallerSystemContractTests(unittest.TestCase):
         self.assertIn("true < /dev/tty", text)
 
     def test_bash_installer_runs_with_args_without_controlling_tty(self):
+        _skip_bash_on_windows()
         if not shutil.which("bash"):
             self.skipTest("bash is not available")
 
