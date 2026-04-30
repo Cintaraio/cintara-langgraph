@@ -25,6 +25,9 @@ The node reads a pending tool call from graph state, sends it to Cintara, and wr
 
 ## Install Locally
 
+Python 3.11 or newer is recommended. If your default `python3` is older, use
+`PYTHON=python3.11` before running the installer.
+
 ```bash
 cd cintara-langgraph
 python3 -m pip install -e .
@@ -66,7 +69,8 @@ curl -fsSL https://raw.githubusercontent.com/Cintaraio/cintara-langgraph/main/sc
   --tenant-id "<tenant-id>" \
   --policy-url "https://platform.cintara.io/policy" \
   --registry-url "https://platform.cintara.io/registry" \
-  --gateway-url "https://gateway.cintara.io"
+  --gateway-url "https://gateway.cintara.io" \
+  --api-token "<cintara-runtime-token>"
 ```
 
 Windows PowerShell:
@@ -78,7 +82,8 @@ powershell -ExecutionPolicy Bypass -File .\install-cintara-langgraph.ps1 `
   -TenantId "<tenant-id>" `
   -PolicyUrl "https://platform.cintara.io/policy" `
   -RegistryUrl "https://platform.cintara.io/registry" `
-  -GatewayUrl "https://gateway.cintara.io"
+  -GatewayUrl "https://gateway.cintara.io" `
+  -ApiToken "<cintara-runtime-token>"
 ```
 
 The script installs the package, prompts locally for any missing values, creates
