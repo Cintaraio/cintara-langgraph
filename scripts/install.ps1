@@ -19,7 +19,11 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$PackageSpec = "cintara-langgraph[langgraph] @ git+https://github.com/Cintaraio/cintara-langgraph.git"
+$PackageSpec = if ($env:CINTARA_LANGGRAPH_PACKAGE_SPEC) {
+    $env:CINTARA_LANGGRAPH_PACKAGE_SPEC
+} else {
+    "cintara-langgraph[langgraph] @ git+https://github.com/Cintaraio/cintara-langgraph.git"
+}
 
 function Test-PythonCommand {
     param(
@@ -103,7 +107,7 @@ if (-not $env:VIRTUAL_ENV) {
     $script:PythonPrefixArgs = @()
 }
 
-Invoke-Python -Arguments @("-m", "pip", "install", $PackageSpec)
+Invoke-Python -Arguments @("-m", "pip", "--disable-pip-version-check", "install", $PackageSpec)
 
 Write-Host ""
 Write-Host "Initializing Cintara LangGraph onboarding files..."
@@ -128,8 +132,3 @@ if ($SkipSmokeTest) {
 }
 
 Invoke-Python -Arguments $initArgs
-
-Write-Host ""
-Write-Host "Windows next steps:"
-Write-Host "  . .\.env.cintara.ps1"
-Write-Host "  cintara-langgraph test"

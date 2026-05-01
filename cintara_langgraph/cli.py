@@ -65,7 +65,10 @@ def build_env_file(config: InitConfig) -> str:
     return "\n".join(
         [
             "# Cintara LangGraph configuration",
-            "# Load with: source .env.cintara",
+            "# Load from your project directory with: source .env.cintara",
+            'if [ -d "$PWD/.venv/bin" ]; then',
+            '  export PATH="$PWD/.venv/bin:$PATH"',
+            "fi",
             f"export CINTARA_POLICY_URL={_quote(config.policy_url)}",
             f"export CINTARA_REGISTRY_URL={_quote(config.registry_url)}",
             f"export CINTARA_GATEWAY_URL={_quote(config.gateway_url)}",
@@ -82,7 +85,11 @@ def build_powershell_env_file(config: InitConfig) -> str:
     return "\n".join(
         [
             "# Cintara LangGraph configuration",
-            "# Load with: . .\\.env.cintara.ps1",
+            "# Load from your project directory with: . .\\.env.cintara.ps1",
+            "$venvScripts = Join-Path (Get-Location) '.venv\\Scripts'",
+            "if (Test-Path $venvScripts) {",
+            '    $env:PATH = "$venvScripts;$env:PATH"',
+            "}",
             f"$env:CINTARA_POLICY_URL = {_ps_quote(config.policy_url)}",
             f"$env:CINTARA_REGISTRY_URL = {_ps_quote(config.registry_url)}",
             f"$env:CINTARA_GATEWAY_URL = {_ps_quote(config.gateway_url)}",
@@ -214,6 +221,12 @@ def build_smoke_test_file() -> str:
             print("Reason:", decision.get("reason"))
             if decision.get("request_id"):
                 print("Request id:", decision["request_id"])
+            reason = str(decision.get("reason") or "").lower()
+            if decision.get("route") == "deny" and "tool not found" in reason:
+                print(
+                    "Note: this is an expected safe-deny if your admin has not "
+                    "registered the demo tool yet. Connectivity is working."
+                )
             return 2 if decision.get("route") == "error" else 0
 
 
@@ -415,14 +428,20 @@ def _run_smoke_test(config: InitConfig) -> int:
         )
     except Exception as exc:
         print(f"Smoke test could not reach Cintara: {exc}")
-        print("Files were still created. Re-run `cintara-langgraph test` after checking the values.")
+        print("Files were still created. Re-run `python -m cintara_langgraph test` after checking the values.")
         return 0
 
     decision = result["cintara"]
-    print("Smoke test reached Cintara.")
+    print("Cintara connectivity check reached the Control Plane.")
     print(f"Route: {decision.get('route')}")
     print(f"Action: {decision.get('action')}")
     print(f"Reason: {decision.get('reason')}")
+    reason = str(decision.get("reason") or "").lower()
+    if decision.get("route") == "deny" and "tool not found" in reason:
+        print(
+            "Note: this is an expected safe-deny if your admin has not "
+            "registered the demo tool yet. Connectivity is working."
+        )
     return 0
 
 
@@ -442,9 +461,12 @@ def run_init(args: argparse.Namespace) -> int:
         _run_smoke_test(config)
 
     print("\nNext:")
-    print("  macOS/Linux: source .env.cintara")
-    print("  Windows PowerShell: . .\\.env.cintara.ps1")
-    print("  cintara-langgraph test")
+    print("  macOS/Linux:")
+    print("    source .env.cintara")
+    print("    python -m cintara_langgraph test")
+    print("  Windows PowerShell:")
+    print("    . .\\.env.cintara.ps1")
+    print("    python -m cintara_langgraph test")
     print("  import add_cintara_guard from cintara_guard.py in your LangGraph workflow")
     return 0
 
@@ -479,7 +501,7 @@ def run_test(args: argparse.Namespace) -> int:
         )
     except KeyError as exc:
         print(f"Missing environment value: {exc}")
-        print("Run `cintara-langgraph init` or `source .env.cintara` first.")
+        print("Run `python -m cintara_langgraph init` or load `.env.cintara` first.")
         return 2
     except Exception as exc:
         print(f"Cintara smoke test failed: {exc}")
@@ -499,7 +521,7 @@ def run_install(args: argparse.Namespace) -> int:
         "cintara-langgraph[langgraph] @ "
         "git+https://github.com/Cintaraio/cintara-langgraph.git"
     )
-    return subprocess.call([sys.executable, "-m", "pip", "install", package])
+    return subprocess.call([sys.executable, "-m", "pip", "--disable-pip-version-check", "install", package])
 
 
 def build_parser() -> argparse.ArgumentParser:

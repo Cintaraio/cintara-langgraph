@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PACKAGE_SPEC='cintara-langgraph[langgraph] @ git+https://github.com/Cintaraio/cintara-langgraph.git'
+PACKAGE_SPEC="${CINTARA_LANGGRAPH_PACKAGE_SPEC:-cintara-langgraph[langgraph] @ git+https://github.com/Cintaraio/cintara-langgraph.git}"
 
 python_is_compatible() {
   local executable="$1"
@@ -38,7 +38,7 @@ if [ -z "${VIRTUAL_ENV:-}" ]; then
   . .venv/bin/activate
 fi
 
-python -m pip install "$PACKAGE_SPEC"
+python -m pip --disable-pip-version-check install "$PACKAGE_SPEC"
 
 echo
 echo "Initializing Cintara LangGraph onboarding files..."
