@@ -84,8 +84,51 @@ class InstallerSystemContractTests(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stderr)
             calls = calls_file.read_text(encoding="utf-8")
-            self.assertIn("-m pip --disable-pip-version-check install", calls)
+            self.assertIn("-m pip --disable-pip-version-check install --quiet --upgrade --no-cache-dir", calls)
             self.assertIn("-m cintara_langgraph init --agent-id agent-1", calls)
+
+    def test_bash_installer_accepts_positional_setup_code(self):
+        _skip_bash_on_windows()
+        if not shutil.which("bash"):
+            self.skipTest("bash is not available")
+
+        installer = ROOT / "scripts" / "install"
+        with TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            fake_python = tmp_path / "python"
+            calls_file = tmp_path / "calls.txt"
+            fake_python.write_text(
+                "\n".join(
+                    [
+                        "#!/usr/bin/env bash",
+                        "set -euo pipefail",
+                        f"printf '%s\\n' \"$*\" >> {calls_file}",
+                        "if [ \"${1:-}\" = '-c' ]; then exit 0; fi",
+                        "exit 0",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            fake_python.chmod(0o755)
+
+            env = {
+                "PATH": f"{tmp_path}:{os.environ.get('PATH', '')}",
+                "PYTHON": "python",
+                "VIRTUAL_ENV": str(tmp_path / ".venv"),
+            }
+            result = subprocess.run(
+                ["bash", str(installer), "onboard_123", "--developer-email", "dev@example.com"],
+                cwd=tmp_path,
+                env=env,
+                stdin=subprocess.DEVNULL,
+                text=True,
+                capture_output=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            calls = calls_file.read_text(encoding="utf-8")
+            self.assertIn("-m cintara_langgraph init onboard_123 --developer-email dev@example.com", calls)
 
     def test_bash_installer_allows_package_spec_override_for_branch_smoke_tests(self):
         _skip_bash_on_windows()
@@ -129,7 +172,10 @@ class InstallerSystemContractTests(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stderr)
             calls = calls_file.read_text(encoding="utf-8")
-            self.assertIn("-m pip --disable-pip-version-check install local-cintara-langgraph[langgraph]", calls)
+            self.assertIn(
+                "-m pip --disable-pip-version-check install --quiet --upgrade --no-cache-dir local-cintara-langgraph[langgraph]",
+                calls,
+            )
 
     def test_bash_installer_auto_detects_versioned_python_when_python3_is_old(self):
         _skip_bash_on_windows()
@@ -217,7 +263,10 @@ class InstallerSystemContractTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             calls = calls_file.read_text(encoding="utf-8")
             self.assertIn("python3.11 -c", calls)
-            self.assertIn("venv-python -m pip --disable-pip-version-check install", calls)
+            self.assertIn(
+                "venv-python -m pip --disable-pip-version-check install --quiet --upgrade --no-cache-dir",
+                calls,
+            )
             self.assertIn("venv-python -m cintara_langgraph init --agent-id agent-1", calls)
 
     def test_powershell_installer_wires_self_service_and_manual_onboarding(self):
@@ -230,6 +279,8 @@ class InstallerSystemContractTests(unittest.TestCase):
             "$PackageSpec = if ($env:CINTARA_LANGGRAPH_PACKAGE_SPEC)",
             '"cintara-langgraph[langgraph] @ git+https://github.com/Cintaraio/cintara-langgraph.git"',
             "CINTARA_LANGGRAPH_PACKAGE_SPEC",
+            "[Parameter(Position=0)]",
+            "$OnboardingCode = $SetupCode",
             "--onboarding-code",
             "--developer-email",
             "--verification-code",
@@ -240,6 +291,9 @@ class InstallerSystemContractTests(unittest.TestCase):
             "--gateway-url",
             "--api-token",
             "--disable-pip-version-check",
+            "--quiet",
+            "--upgrade",
+            "--no-cache-dir",
         ]:
             self.assertIn(expected, text)
         self.assertNotIn("Windows next steps:", text)

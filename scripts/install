@@ -38,10 +38,11 @@ if [ -z "${VIRTUAL_ENV:-}" ]; then
   . .venv/bin/activate
 fi
 
-python -m pip --disable-pip-version-check install "$PACKAGE_SPEC"
+echo "Installing Cintara LangGraph..."
+python -m pip --disable-pip-version-check install --quiet --upgrade --no-cache-dir "$PACKAGE_SPEC"
 
 echo
-echo "Initializing Cintara LangGraph onboarding files..."
+echo "Setting up Cintara LangGraph..."
 
 if [ -t 0 ]; then
   python -m cintara_langgraph init "$@"
