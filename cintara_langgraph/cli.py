@@ -580,7 +580,19 @@ def run_install(args: argparse.Namespace) -> int:
         "cintara-langgraph[langgraph] @ "
         "git+https://github.com/Cintaraio/cintara-langgraph.git"
     )
-    return subprocess.call([sys.executable, "-m", "pip", "--disable-pip-version-check", "install", package])
+    return subprocess.call(
+        [
+            sys.executable,
+            "-m",
+            "pip",
+            "--disable-pip-version-check",
+            "install",
+            "--quiet",
+            "--upgrade",
+            "--no-cache-dir",
+            package,
+        ]
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:

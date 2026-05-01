@@ -84,7 +84,7 @@ class InstallerSystemContractTests(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stderr)
             calls = calls_file.read_text(encoding="utf-8")
-            self.assertIn("-m pip --disable-pip-version-check install", calls)
+            self.assertIn("-m pip --disable-pip-version-check install --quiet --upgrade --no-cache-dir", calls)
             self.assertIn("-m cintara_langgraph init --agent-id agent-1", calls)
 
     def test_bash_installer_accepts_positional_setup_code(self):
@@ -172,7 +172,10 @@ class InstallerSystemContractTests(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stderr)
             calls = calls_file.read_text(encoding="utf-8")
-            self.assertIn("-m pip --disable-pip-version-check install local-cintara-langgraph[langgraph]", calls)
+            self.assertIn(
+                "-m pip --disable-pip-version-check install --quiet --upgrade --no-cache-dir local-cintara-langgraph[langgraph]",
+                calls,
+            )
 
     def test_bash_installer_auto_detects_versioned_python_when_python3_is_old(self):
         _skip_bash_on_windows()
@@ -260,7 +263,10 @@ class InstallerSystemContractTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             calls = calls_file.read_text(encoding="utf-8")
             self.assertIn("python3.11 -c", calls)
-            self.assertIn("venv-python -m pip --disable-pip-version-check install", calls)
+            self.assertIn(
+                "venv-python -m pip --disable-pip-version-check install --quiet --upgrade --no-cache-dir",
+                calls,
+            )
             self.assertIn("venv-python -m cintara_langgraph init --agent-id agent-1", calls)
 
     def test_powershell_installer_wires_self_service_and_manual_onboarding(self):
@@ -285,6 +291,9 @@ class InstallerSystemContractTests(unittest.TestCase):
             "--gateway-url",
             "--api-token",
             "--disable-pip-version-check",
+            "--quiet",
+            "--upgrade",
+            "--no-cache-dir",
         ]:
             self.assertIn(expected, text)
         self.assertNotIn("Windows next steps:", text)

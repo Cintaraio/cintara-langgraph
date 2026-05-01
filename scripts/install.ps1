@@ -112,7 +112,8 @@ if (-not $env:VIRTUAL_ENV) {
     $script:PythonPrefixArgs = @()
 }
 
-Invoke-Python -Arguments @("-m", "pip", "--disable-pip-version-check", "install", $PackageSpec)
+Write-Host "Installing Cintara LangGraph..."
+Invoke-Python -Arguments @("-m", "pip", "--disable-pip-version-check", "install", "--quiet", "--upgrade", "--no-cache-dir", $PackageSpec)
 
 Write-Host ""
 Write-Host "Setting up Cintara LangGraph..."

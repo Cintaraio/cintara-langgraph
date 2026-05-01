@@ -38,7 +38,8 @@ if [ -z "${VIRTUAL_ENV:-}" ]; then
   . .venv/bin/activate
 fi
 
-python -m pip --disable-pip-version-check install "$PACKAGE_SPEC"
+echo "Installing Cintara LangGraph..."
+python -m pip --disable-pip-version-check install --quiet --upgrade --no-cache-dir "$PACKAGE_SPEC"
 
 echo
 echo "Setting up Cintara LangGraph..."
