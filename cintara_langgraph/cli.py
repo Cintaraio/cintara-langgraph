@@ -268,9 +268,6 @@ def build_smoke_test_file() -> str:
             print("Cintara LangGraph is ready.")
             print("Connected to Cintara.")
             print("LangGraph guard is ready.")
-            reason = str(decision.get("reason") or "").lower()
-            if decision.get("route") == "deny" and "tool not found" in reason:
-                print("Control Plane reached successfully.")
             return 0
 
 
@@ -514,9 +511,6 @@ def _run_smoke_test(config: InitConfig) -> int:
     print("Cintara LangGraph is ready.")
     print("Connected to Cintara.")
     print("LangGraph guard is ready.")
-    reason = str(decision.get("reason") or "").lower()
-    if decision.get("route") == "deny" and "tool not found" in reason:
-        print("Control Plane reached successfully.")
     return 0
 
 

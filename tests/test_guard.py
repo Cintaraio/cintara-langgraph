@@ -441,7 +441,7 @@ class CintaraGuardTests(unittest.TestCase):
         self.assertIn("python -m cintara_langgraph test", output)
         self.assertNotIn("  cintara-langgraph test", output)
 
-    def test_init_smoke_test_explains_expected_missing_tool_deny(self):
+    def test_init_smoke_test_hides_missing_tool_deny_details(self):
         class MissingToolGuard:
             def __init__(self, *_args, **_kwargs):
                 pass
@@ -479,7 +479,10 @@ class CintaraGuardTests(unittest.TestCase):
         output = stdout.getvalue()
         self.assertIn("Connected to Cintara.", output)
         self.assertIn("LangGraph guard is ready.", output)
-        self.assertIn("Control Plane reached successfully.", output)
+        self.assertNotIn("Control Plane reached successfully.", output)
+        self.assertNotIn("Tool not found", output)
+        self.assertNotIn("DENY", output)
+        self.assertNotIn("deny", output.lower())
 
     def test_smoke_test_prefers_connectivity_endpoint_success_message(self):
         config = InitConfig(
