@@ -19,7 +19,11 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$PackageSpec = "cintara-langgraph[langgraph] @ git+https://github.com/Cintaraio/cintara-langgraph.git"
+$PackageSpec = if ($env:CINTARA_LANGGRAPH_PACKAGE_SPEC) {
+    $env:CINTARA_LANGGRAPH_PACKAGE_SPEC
+} else {
+    "cintara-langgraph[langgraph] @ git+https://github.com/Cintaraio/cintara-langgraph.git"
+}
 
 function Test-PythonCommand {
     param(

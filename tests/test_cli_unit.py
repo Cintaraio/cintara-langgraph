@@ -51,6 +51,8 @@ class CintaraCliUnitTests(unittest.TestCase):
 
         self.assertEqual(values["CINTARA_API_TOKEN"], "token with spaces")
         self.assertEqual(values["CINTARA_DEMO_TOOL_NAME"], "send email")
+        self.assertIn('$PWD/.venv/bin', env_file)
+        self.assertIn('export PATH="$PWD/.venv/bin:$PATH"', env_file)
 
     def test_build_powershell_env_file_escapes_token_value(self):
         config = InitConfig(
@@ -65,6 +67,8 @@ class CintaraCliUnitTests(unittest.TestCase):
         powershell_env = build_powershell_env_file(config)
 
         self.assertIn("$env:CINTARA_API_TOKEN = 'token''s value'", powershell_env)
+        self.assertIn("$venvScripts = Join-Path (Get-Location) '.venv\\Scripts'", powershell_env)
+        self.assertIn('$env:PATH = "$venvScripts;$env:PATH"', powershell_env)
 
     def test_load_env_file_ignores_comments_blank_lines_and_non_exports(self):
         with TemporaryDirectory() as tmp:

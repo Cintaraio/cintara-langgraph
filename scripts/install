@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PACKAGE_SPEC='cintara-langgraph[langgraph] @ git+https://github.com/Cintaraio/cintara-langgraph.git'
+PACKAGE_SPEC="${CINTARA_LANGGRAPH_PACKAGE_SPEC:-cintara-langgraph[langgraph] @ git+https://github.com/Cintaraio/cintara-langgraph.git}"
 
 python_is_compatible() {
   local executable="$1"
