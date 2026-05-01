@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import unittest
-from contextlib import redirect_stderr
+from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -15,6 +15,7 @@ from cintara_langgraph.cli import (
     _response_error_message,
     build_powershell_env_file,
     load_env_file,
+    run_init,
     write_init_files,
 )
 
@@ -291,7 +292,12 @@ class CintaraGuardTests(unittest.TestCase):
                 {".env.cintara", ".env.cintara.ps1", "cintara_guard.py", "cintara_smoke_test.py"},
             )
             env_values = load_env_file(project_dir / ".env.cintara")
+            shell_env = (project_dir / ".env.cintara").read_text(encoding="utf-8")
             powershell_env = (project_dir / ".env.cintara.ps1").read_text(encoding="utf-8")
+            self.assertIn('.venv/bin', shell_env)
+            self.assertIn("export PATH", shell_env)
+            self.assertIn(".venv\\Scripts", powershell_env)
+            self.assertIn("$env:PATH", powershell_env)
 
         self.assertEqual(env_values["CINTARA_AGENT_ID"], "agent-1")
         self.assertEqual(env_values["CINTARA_TENANT_ID"], "tenant-1")
@@ -375,6 +381,33 @@ class CintaraGuardTests(unittest.TestCase):
         self.assertIn("temporarily unavailable", output)
         self.assertIn("LangGraph onboarding service", output)
         self.assertNotIn("Internal Server Error", output)
+
+    def test_init_next_steps_use_module_command_after_loading_env(self):
+        args = SimpleNamespace(
+            project_dir=".",
+            overwrite=False,
+            skip_smoke_test=True,
+            onboarding_code=None,
+            agent_id="agent-1",
+            tenant_id="tenant-1",
+            policy_url="https://platform.cintara.io/policy",
+            registry_url="https://platform.cintara.io/registry",
+            gateway_url="https://gateway.cintara.io",
+            api_token="runtime-token-1",
+            tool_name="send_email",
+        )
+        stdout = StringIO()
+
+        with TemporaryDirectory() as tmp:
+            args.project_dir = tmp
+            with redirect_stdout(stdout):
+                run_init(args)
+
+        output = stdout.getvalue()
+        self.assertIn("source .env.cintara", output)
+        self.assertIn(". .\\.env.cintara.ps1", output)
+        self.assertIn("python -m cintara_langgraph test", output)
+        self.assertNotIn("  cintara-langgraph test", output)
 
     def test_response_error_message_uses_backend_detail_for_503(self):
         response = FakeOnboardingResponse(

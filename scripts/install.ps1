@@ -128,8 +128,3 @@ if ($SkipSmokeTest) {
 }
 
 Invoke-Python -Arguments $initArgs
-
-Write-Host ""
-Write-Host "Windows next steps:"
-Write-Host "  . .\.env.cintara.ps1"
-Write-Host "  cintara-langgraph test"

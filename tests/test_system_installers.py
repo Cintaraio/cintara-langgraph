@@ -193,9 +193,9 @@ class InstallerSystemContractTests(unittest.TestCase):
             "--registry-url",
             "--gateway-url",
             "--api-token",
-            "cintara-langgraph test",
         ]:
             self.assertIn(expected, text)
+        self.assertNotIn("Windows next steps:", text)
 
     def test_readme_public_install_urls_match_real_scripts(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")

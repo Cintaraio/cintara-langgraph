@@ -44,13 +44,16 @@ class CintaraCliIntegrationTests(unittest.TestCase):
             )
 
             self.assertIn("Created:", result.stdout)
-            self.assertIn("cintara-langgraph test", result.stdout)
+            self.assertIn("python -m cintara_langgraph test", result.stdout)
             self.assertTrue((project_dir / ".env.cintara").exists())
             self.assertTrue((project_dir / ".env.cintara.ps1").exists())
             self.assertTrue((project_dir / "cintara_guard.py").exists())
             self.assertTrue((project_dir / "cintara_smoke_test.py").exists())
 
             env_text = (project_dir / ".env.cintara").read_text(encoding="utf-8")
+            ps_env_text = (project_dir / ".env.cintara.ps1").read_text(encoding="utf-8")
+            self.assertIn('.venv/bin', env_text)
+            self.assertIn(".venv\\Scripts", ps_env_text)
             self.assertIn("export CINTARA_AGENT_ID=agent-1", env_text)
             self.assertIn("export CINTARA_API_TOKEN=runtime-token-1", env_text)
 

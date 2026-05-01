@@ -26,7 +26,9 @@ The node reads a pending tool call from graph state, sends it to Cintara, and wr
 ## Install Locally
 
 Python 3.11 or newer is recommended. If your default `python3` is older, use
-`PYTHON=python3.11` before running the installer.
+`PYTHON=python3.11` before running the installer. The installer creates a local
+`.venv` and the generated `.env.cintara` files add that `.venv` to your shell
+path when loaded from the project directory.
 
 ```bash
 cd cintara-langgraph
@@ -95,15 +97,19 @@ After installation:
 
 ```bash
 source .env.cintara
-cintara-langgraph test
+python -m cintara_langgraph test
 ```
 
 On Windows PowerShell:
 
 ```powershell
 . .\.env.cintara.ps1
-cintara-langgraph test
+python -m cintara_langgraph test
 ```
+
+If your own LangGraph app calls an LLM provider, set that provider's key as
+well, for example `OPENAI_API_KEY`. The Cintara smoke test itself does not need
+an OpenAI key.
 
 You can also run the initializer directly:
 
