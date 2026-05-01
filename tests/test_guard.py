@@ -294,10 +294,13 @@ class CintaraGuardTests(unittest.TestCase):
             env_values = load_env_file(project_dir / ".env.cintara")
             shell_env = (project_dir / ".env.cintara").read_text(encoding="utf-8")
             powershell_env = (project_dir / ".env.cintara.ps1").read_text(encoding="utf-8")
+            smoke_test = (project_dir / "cintara_smoke_test.py").read_text(encoding="utf-8")
             self.assertIn('.venv/bin', shell_env)
             self.assertIn("export PATH", shell_env)
             self.assertIn(".venv\\Scripts", powershell_env)
             self.assertIn("$env:PATH", powershell_env)
+            self.assertIn("expected safe-deny", smoke_test)
+            self.assertIn("Connectivity is working", smoke_test)
 
         self.assertEqual(env_values["CINTARA_AGENT_ID"], "agent-1")
         self.assertEqual(env_values["CINTARA_TENANT_ID"], "tenant-1")
@@ -408,6 +411,46 @@ class CintaraGuardTests(unittest.TestCase):
         self.assertIn(". .\\.env.cintara.ps1", output)
         self.assertIn("python -m cintara_langgraph test", output)
         self.assertNotIn("  cintara-langgraph test", output)
+
+    def test_init_smoke_test_explains_expected_missing_tool_deny(self):
+        class MissingToolGuard:
+            def __init__(self, *_args, **_kwargs):
+                pass
+
+            def __call__(self, _state):
+                return {
+                    "cintara": {
+                        "route": "deny",
+                        "action": "DENY",
+                        "reason": "Tool not found — denied (fail closed)",
+                    }
+                }
+
+        args = SimpleNamespace(
+            project_dir=".",
+            overwrite=False,
+            skip_smoke_test=False,
+            onboarding_code=None,
+            agent_id="agent-1",
+            tenant_id="tenant-1",
+            policy_url="https://platform.cintara.io/policy",
+            registry_url="https://platform.cintara.io/registry",
+            gateway_url="https://gateway.cintara.io",
+            api_token="runtime-token-1",
+            tool_name="send_email",
+        )
+        stdout = StringIO()
+
+        with TemporaryDirectory() as tmp:
+            args.project_dir = tmp
+            with patch("cintara_langgraph.cli.CintaraGuard", MissingToolGuard):
+                with redirect_stdout(stdout):
+                    run_init(args)
+
+        output = stdout.getvalue()
+        self.assertIn("Cintara connectivity check reached the Control Plane.", output)
+        self.assertIn("expected safe-deny", output)
+        self.assertIn("Connectivity is working", output)
 
     def test_response_error_message_uses_backend_detail_for_503(self):
         response = FakeOnboardingResponse(

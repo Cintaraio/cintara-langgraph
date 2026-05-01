@@ -221,6 +221,12 @@ def build_smoke_test_file() -> str:
             print("Reason:", decision.get("reason"))
             if decision.get("request_id"):
                 print("Request id:", decision["request_id"])
+            reason = str(decision.get("reason") or "").lower()
+            if decision.get("route") == "deny" and "tool not found" in reason:
+                print(
+                    "Note: this is an expected safe-deny if your admin has not "
+                    "registered the demo tool yet. Connectivity is working."
+                )
             return 2 if decision.get("route") == "error" else 0
 
 
@@ -426,10 +432,16 @@ def _run_smoke_test(config: InitConfig) -> int:
         return 0
 
     decision = result["cintara"]
-    print("Smoke test reached Cintara.")
+    print("Cintara connectivity check reached the Control Plane.")
     print(f"Route: {decision.get('route')}")
     print(f"Action: {decision.get('action')}")
     print(f"Reason: {decision.get('reason')}")
+    reason = str(decision.get("reason") or "").lower()
+    if decision.get("route") == "deny" and "tool not found" in reason:
+        print(
+            "Note: this is an expected safe-deny if your admin has not "
+            "registered the demo tool yet. Connectivity is working."
+        )
     return 0
 
 
@@ -509,7 +521,7 @@ def run_install(args: argparse.Namespace) -> int:
         "cintara-langgraph[langgraph] @ "
         "git+https://github.com/Cintaraio/cintara-langgraph.git"
     )
-    return subprocess.call([sys.executable, "-m", "pip", "install", package])
+    return subprocess.call([sys.executable, "-m", "pip", "--disable-pip-version-check", "install", package])
 
 
 def build_parser() -> argparse.ArgumentParser:

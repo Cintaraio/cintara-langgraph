@@ -111,6 +111,11 @@ If your own LangGraph app calls an LLM provider, set that provider's key as
 well, for example `OPENAI_API_KEY`. The Cintara smoke test itself does not need
 an OpenAI key.
 
+If the smoke test returns `DENY` with `Tool not found`, onboarding still worked:
+Cintara was reachable and safely denied an unregistered demo tool. Ask your
+Cintara admin to register the demo tool, or test with a tool that already exists
+in your tenant.
+
 You can also run the initializer directly:
 
 ```bash

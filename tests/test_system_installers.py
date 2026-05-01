@@ -84,7 +84,7 @@ class InstallerSystemContractTests(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stderr)
             calls = calls_file.read_text(encoding="utf-8")
-            self.assertIn("-m pip install", calls)
+            self.assertIn("-m pip --disable-pip-version-check install", calls)
             self.assertIn("-m cintara_langgraph init --agent-id agent-1", calls)
 
     def test_bash_installer_allows_package_spec_override_for_branch_smoke_tests(self):
@@ -129,7 +129,7 @@ class InstallerSystemContractTests(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stderr)
             calls = calls_file.read_text(encoding="utf-8")
-            self.assertIn("-m pip install local-cintara-langgraph[langgraph]", calls)
+            self.assertIn("-m pip --disable-pip-version-check install local-cintara-langgraph[langgraph]", calls)
 
     def test_bash_installer_auto_detects_versioned_python_when_python3_is_old(self):
         _skip_bash_on_windows()
@@ -217,7 +217,7 @@ class InstallerSystemContractTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             calls = calls_file.read_text(encoding="utf-8")
             self.assertIn("python3.11 -c", calls)
-            self.assertIn("venv-python -m pip install", calls)
+            self.assertIn("venv-python -m pip --disable-pip-version-check install", calls)
             self.assertIn("venv-python -m cintara_langgraph init --agent-id agent-1", calls)
 
     def test_powershell_installer_wires_self_service_and_manual_onboarding(self):
@@ -239,9 +239,18 @@ class InstallerSystemContractTests(unittest.TestCase):
             "--registry-url",
             "--gateway-url",
             "--api-token",
+            "--disable-pip-version-check",
         ]:
             self.assertIn(expected, text)
         self.assertNotIn("Windows next steps:", text)
+
+    def test_legacy_install_langgraph_script_delegates_to_canonical_installer(self):
+        legacy = ROOT / "scripts" / "install-langgraph.sh"
+        text = legacy.read_text(encoding="utf-8")
+
+        self.assertIn('exec "$SCRIPT_DIR/install" "$@"', text)
+        self.assertNotIn("PYTHON_BIN=", text)
+        self.assertNotIn("python -m pip install", text)
 
     def test_readme_public_install_urls_match_real_scripts(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
