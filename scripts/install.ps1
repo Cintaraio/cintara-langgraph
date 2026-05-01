@@ -2,6 +2,8 @@
 
 [CmdletBinding()]
 param(
+    [Parameter(Position=0)]
+    [string]$SetupCode,
     [string]$OnboardingCode,
     [string]$DeveloperEmail,
     [string]$VerificationCode,
@@ -19,6 +21,9 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+if (-not $OnboardingCode -and $SetupCode) {
+    $OnboardingCode = $SetupCode
+}
 $PackageSpec = if ($env:CINTARA_LANGGRAPH_PACKAGE_SPEC) {
     $env:CINTARA_LANGGRAPH_PACKAGE_SPEC
 } else {
@@ -110,7 +115,7 @@ if (-not $env:VIRTUAL_ENV) {
 Invoke-Python -Arguments @("-m", "pip", "--disable-pip-version-check", "install", $PackageSpec)
 
 Write-Host ""
-Write-Host "Initializing Cintara LangGraph onboarding files..."
+Write-Host "Setting up Cintara LangGraph..."
 
 $initArgs = @("-m", "cintara_langgraph", "init", "--project-dir", $ProjectDir)
 Add-ArgumentIfValue ([ref]$initArgs) "--onboarding-code" $OnboardingCode

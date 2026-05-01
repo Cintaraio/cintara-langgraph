@@ -41,7 +41,7 @@ fi
 python -m pip --disable-pip-version-check install "$PACKAGE_SPEC"
 
 echo
-echo "Initializing Cintara LangGraph onboarding files..."
+echo "Setting up Cintara LangGraph..."
 
 if [ -t 0 ]; then
   python -m cintara_langgraph init "$@"

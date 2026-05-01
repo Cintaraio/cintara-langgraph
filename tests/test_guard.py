@@ -12,6 +12,7 @@ from cintara_langgraph import CintaraClient, CintaraDecision, CintaraGuard, Cint
 from cintara_langgraph.cli import (
     InitConfig,
     _collect_self_service_config,
+    _run_smoke_test,
     _response_error_message,
     build_powershell_env_file,
     load_env_file,
@@ -73,6 +74,9 @@ class FakeOnboardingResponse:
         self._payload = payload
         self.text = str(payload)
 
+    def raise_for_status(self):
+        return None
+
     def json(self):
         return self._payload
 
@@ -118,6 +122,31 @@ class FailingOnboardingHTTPClient:
 
     def post(self, url, json):
         return FakeOnboardingResponse(500, {"detail": "Internal Server Error"})
+
+
+class FakeConnectivityHTTPClient:
+    def __init__(self, timeout):
+        self.timeout = timeout
+        self.calls = []
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
+
+    def get(self, url, headers):
+        self.calls.append({"url": url, "headers": headers})
+        return FakeOnboardingResponse(
+            200,
+            {
+                "status": "connected",
+                "message": "Cintara LangGraph runtime token is valid.",
+                "tenant_id": "tenant-1",
+                "agent_id": "agent-1",
+                "scope": ["policy:decide"],
+            },
+        )
 
 
 class CintaraGuardTests(unittest.TestCase):
@@ -299,8 +328,8 @@ class CintaraGuardTests(unittest.TestCase):
             self.assertIn("export PATH", shell_env)
             self.assertIn(".venv\\Scripts", powershell_env)
             self.assertIn("$env:PATH", powershell_env)
-            self.assertIn("expected safe-deny", smoke_test)
-            self.assertIn("Connectivity is working", smoke_test)
+            self.assertIn("Connected to Cintara.", smoke_test)
+            self.assertIn("LangGraph guard is ready.", smoke_test)
 
         self.assertEqual(env_values["CINTARA_AGENT_ID"], "agent-1")
         self.assertEqual(env_values["CINTARA_TENANT_ID"], "tenant-1")
@@ -448,9 +477,36 @@ class CintaraGuardTests(unittest.TestCase):
                     run_init(args)
 
         output = stdout.getvalue()
-        self.assertIn("Cintara connectivity check reached the Control Plane.", output)
-        self.assertIn("expected safe-deny", output)
-        self.assertIn("Connectivity is working", output)
+        self.assertIn("Connected to Cintara.", output)
+        self.assertIn("LangGraph guard is ready.", output)
+        self.assertIn("Control Plane reached successfully.", output)
+
+    def test_smoke_test_prefers_connectivity_endpoint_success_message(self):
+        config = InitConfig(
+            agent_id="agent-1",
+            tenant_id="tenant-1",
+            policy_url="https://policy.example.com",
+            registry_url="https://registry.example.com",
+            gateway_url="https://gateway.example.com",
+            api_token="runtime-token-1",
+            tool_name="send_email",
+        )
+        stdout = StringIO()
+        fake_http = FakeConnectivityHTTPClient(timeout=10.0)
+
+        with patch("cintara_langgraph.cli.httpx.Client", return_value=fake_http):
+            with patch("cintara_langgraph.cli.CintaraGuard") as guard:
+                with redirect_stdout(stdout):
+                    result = _run_smoke_test(config)
+
+        self.assertEqual(result, 0)
+        self.assertIn("Connected to Cintara.", stdout.getvalue())
+        self.assertIn("LangGraph guard is ready.", stdout.getvalue())
+        self.assertFalse(guard.called)
+        self.assertEqual(
+            fake_http.calls[0]["url"],
+            "https://registry.example.com/api/v1/langgraph/connectivity-check",
+        )
 
     def test_response_error_message_uses_backend_detail_for_503(self):
         response = FakeOnboardingResponse(

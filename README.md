@@ -43,22 +43,20 @@ LangGraph project directory:
 macOS, Linux, WSL, or Git Bash:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Cintaraio/cintara-langgraph/main/scripts/install | bash -s -- \
-  --onboarding-code "<onboarding-code>" \
-  --registry-url "https://platform.cintara.io/registry"
+curl -fsSL https://raw.githubusercontent.com/Cintaraio/cintara-langgraph/main/scripts/install | bash -s -- "<setup-code>"
 ```
 
 Windows PowerShell:
 
 ```powershell
 iwr -UseBasicParsing https://raw.githubusercontent.com/Cintaraio/cintara-langgraph/main/scripts/install.ps1 -OutFile .\install-cintara-langgraph.ps1
-powershell -ExecutionPolicy Bypass -File .\install-cintara-langgraph.ps1 `
-  -OnboardingCode "<onboarding-code>" `
-  -RegistryUrl "https://platform.cintara.io/registry"
+powershell -ExecutionPolicy Bypass -File .\install-cintara-langgraph.ps1 "<setup-code>"
 ```
 
-The self-service flow asks for your developer email, sends a verification code,
-then writes a short-lived agent runtime token into `.env.cintara`.
+The installer asks for your email, sends a verification code, creates local
+setup files, and prints `Connected to Cintara` when the Control Plane is
+reachable. You do not need to understand tenant IDs, agent IDs, registry URLs,
+or runtime tokens for the happy path.
 
 If your Cintara admin gave you explicit values instead of an onboarding code,
 run:
@@ -93,7 +91,7 @@ The script installs the package, prompts locally for any missing values, creates
 `cintara_guard.py`, and creates `cintara_smoke_test.py`. The preferred path is
 self-service onboarding. You should not copy a token from browser DevTools.
 
-After installation:
+The installer runs a connectivity check automatically. To run it again:
 
 ```bash
 source .env.cintara
@@ -111,10 +109,13 @@ If your own LangGraph app calls an LLM provider, set that provider's key as
 well, for example `OPENAI_API_KEY`. The Cintara smoke test itself does not need
 an OpenAI key.
 
-If the smoke test returns `DENY` with `Tool not found`, onboarding still worked:
-Cintara was reachable and safely denied an unregistered demo tool. Ask your
-Cintara admin to register the demo tool, or test with a tool that already exists
-in your tenant.
+Expected result:
+
+```text
+Cintara LangGraph is ready.
+Connected to Cintara.
+LangGraph guard is ready.
+```
 
 You can also run the initializer directly:
 

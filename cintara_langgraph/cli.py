@@ -21,6 +21,7 @@ DEFAULT_POLICY_URL = "https://platform.cintara.io/policy"
 DEFAULT_REGISTRY_URL = "https://platform.cintara.io/registry"
 DEFAULT_GATEWAY_URL = "https://gateway.cintara.io"
 DEFAULT_TOOL_NAME = "send_email"
+CONNECTIVITY_PATH = "/langgraph/connectivity-check"
 
 
 @dataclass(frozen=True)
@@ -173,7 +174,12 @@ def build_smoke_test_file() -> str:
         import sys
         from pathlib import Path
 
+        import httpx
+
         from cintara_langgraph import CintaraGuard
+
+
+        CONNECTIVITY_PATH = "/langgraph/connectivity-check"
 
 
         def load_env(path: str = ".env.cintara") -> None:
@@ -193,41 +199,79 @@ def build_smoke_test_file() -> str:
                 os.environ.setdefault(key, value)
 
 
+        def api_base(url: str) -> str:
+            cleaned = url.strip().rstrip("/")
+            return cleaned if cleaned.endswith("/api/v1") else f"{cleaned}/api/v1"
+
+
+        def connectivity_check() -> bool:
+            registry_url = os.environ.get("CINTARA_REGISTRY_URL", "").strip()
+            token = os.environ.get("CINTARA_API_TOKEN", "").strip()
+            if not registry_url or not token:
+                return False
+
+            with httpx.Client(timeout=10.0) as client:
+                response = client.get(
+                    f"{api_base(registry_url)}{CONNECTIVITY_PATH}",
+                    headers={
+                        "Authorization": f"Bearer {token}",
+                        "Accept": "application/json",
+                    },
+                )
+                if response.status_code == 404:
+                    return False
+                response.raise_for_status()
+            return True
+
+
         def main() -> int:
             load_env()
-            guard = CintaraGuard(agent_id=os.environ["CINTARA_AGENT_ID"])
-            result = guard(
-                {
-                    "tool_call": {
-                        "name": os.getenv("CINTARA_DEMO_TOOL_NAME", "send_email"),
-                        "args": {
-                            "to_email": "customer@example.com",
-                            "body": "Hello from LangGraph.",
-                            "amount": 7000,
+            try:
+                if connectivity_check():
+                    print("Cintara LangGraph is ready.")
+                    print("Connected to Cintara.")
+                    print("LangGraph guard is ready.")
+                    return 0
+            except Exception:
+                pass
+
+            try:
+                guard = CintaraGuard(agent_id=os.environ["CINTARA_AGENT_ID"])
+                result = guard(
+                    {
+                        "tool_call": {
+                            "name": os.getenv("CINTARA_DEMO_TOOL_NAME", "send_email"),
+                            "args": {
+                                "to_email": "customer@example.com",
+                                "body": "Hello from LangGraph.",
+                                "amount": 7000,
+                            },
                         },
-                    },
-                    "user_id": "langgraph-quickstart-user",
-                    "tool_risk_tier": "WRITE",
-                    "session_context": {
-                        "user_email": "langgraph-quickstart@example.com",
-                        "user_roles": ["tenant_admin"],
-                        "request_ip": "127.0.0.1",
-                    },
-                }
-            )
+                        "user_id": "langgraph-quickstart-user",
+                        "tool_risk_tier": "WRITE",
+                        "session_context": {
+                            "user_email": "langgraph-quickstart@example.com",
+                            "user_roles": ["tenant_admin"],
+                            "request_ip": "127.0.0.1",
+                        },
+                    }
+                )
+            except Exception as exc:
+                print(f"Cintara connectivity check failed: {exc}")
+                return 2
             decision = result["cintara"]
-            print("Cintara route:", decision.get("route"))
-            print("Cintara action:", decision.get("action"))
-            print("Reason:", decision.get("reason"))
-            if decision.get("request_id"):
-                print("Request id:", decision["request_id"])
+            if decision.get("route") == "error":
+                print("Cintara connectivity check failed.")
+                print("Reason:", decision.get("reason"))
+                return 2
+
+            print("Cintara LangGraph is ready.")
+            print("Connected to Cintara.")
+            print("LangGraph guard is ready.")
             reason = str(decision.get("reason") or "").lower()
             if decision.get("route") == "deny" and "tool not found" in reason:
-                print(
-                    "Note: this is an expected safe-deny if your admin has not "
-                    "registered the demo tool yet. Connectivity is working."
-                )
-            return 2 if decision.get("route") == "error" else 0
+                print("Control Plane reached successfully.")
+            return 0
 
 
         if __name__ == "__main__":
@@ -305,15 +349,15 @@ def _response_error_message(response: httpx.Response) -> str:
 
 def _collect_self_service_config(args: argparse.Namespace, registry_url: str) -> InitConfig:
     developer_email = _prompt(
-        "Developer email",
+        "Email",
         args.developer_email or os.environ.get("CINTARA_DEVELOPER_EMAIL"),
     )
     if not developer_email:
-        print("Developer email is required when using --onboarding-code.", file=sys.stderr)
+        print("Email is required to finish Cintara setup.", file=sys.stderr)
         raise SystemExit(2)
 
     api_base = _api_base(registry_url)
-    onboarding_code = args.onboarding_code.strip()
+    onboarding_code = (args.onboarding_code or getattr(args, "setup_code", None) or "").strip()
     start_url = f"{api_base}/langgraph/onboarding/{onboarding_code}/start"
     complete_url = f"{api_base}/langgraph/onboarding/{onboarding_code}/complete"
 
@@ -364,7 +408,17 @@ def _collect_config(args: argparse.Namespace) -> InitConfig:
     registry_url = _clean_url(args.registry_url or env.get("CINTARA_REGISTRY_URL") or DEFAULT_REGISTRY_URL)
     gateway_url = _clean_url(args.gateway_url or env.get("CINTARA_GATEWAY_URL") or DEFAULT_GATEWAY_URL)
 
-    if args.onboarding_code:
+    onboarding_code = (
+        args.onboarding_code
+        or getattr(args, "setup_code", None)
+        or env.get("CINTARA_ONBOARDING_CODE")
+        or env.get("CINTARA_SETUP_CODE")
+    )
+    manual_values_present = bool(args.agent_id or args.tenant_id or args.api_token)
+    if not onboarding_code and not manual_values_present and sys.stdin.isatty():
+        onboarding_code = _prompt("Cintara setup code")
+    if onboarding_code:
+        args.onboarding_code = onboarding_code
         return _collect_self_service_config(args, registry_url)
 
     agent_id = _prompt("Cintara agent id", args.agent_id or env.get("CINTARA_AGENT_ID"))
@@ -395,9 +449,29 @@ def _collect_config(args: argparse.Namespace) -> InitConfig:
 
 def _run_smoke_test(config: InitConfig) -> int:
     if _is_placeholder(config.api_token) or _is_placeholder(config.agent_id) or _is_placeholder(config.tenant_id):
-        print("Skipping smoke test because one or more required values are placeholders.")
-        print("Ask your Cintara admin for a generated LangGraph setup command or runtime token.")
+        print("Cintara files were created, but setup is not connected yet.")
+        print("Use a setup code or runtime token from your Cintara contact to connect.")
         return 0
+
+    try:
+        with httpx.Client(timeout=10.0) as http_client:
+            response = http_client.get(
+                f"{_api_base(config.registry_url)}{CONNECTIVITY_PATH}",
+                headers={
+                    "Authorization": f"Bearer {config.api_token}",
+                    "Accept": "application/json",
+                },
+            )
+            if response.status_code != 404:
+                response.raise_for_status()
+                print("Cintara LangGraph is ready.")
+                print("Connected to Cintara.")
+                print("LangGraph guard is ready.")
+                return 0
+    except Exception:
+        # Older Control Plane deployments do not have the connectivity endpoint.
+        # Fall back to a policy decision request, but keep the user-facing output simple.
+        pass
 
     try:
         client = CintaraClient(
@@ -427,21 +501,22 @@ def _run_smoke_test(config: InitConfig) -> int:
             }
         )
     except Exception as exc:
-        print(f"Smoke test could not reach Cintara: {exc}")
+        print(f"Cintara connectivity check failed: {exc}")
         print("Files were still created. Re-run `python -m cintara_langgraph test` after checking the values.")
         return 0
 
     decision = result["cintara"]
-    print("Cintara connectivity check reached the Control Plane.")
-    print(f"Route: {decision.get('route')}")
-    print(f"Action: {decision.get('action')}")
-    print(f"Reason: {decision.get('reason')}")
+    if decision.get("route") == "error":
+        print("Cintara connectivity check failed.")
+        print(f"Reason: {decision.get('reason')}")
+        return 0
+
+    print("Cintara LangGraph is ready.")
+    print("Connected to Cintara.")
+    print("LangGraph guard is ready.")
     reason = str(decision.get("reason") or "").lower()
     if decision.get("route") == "deny" and "tool not found" in reason:
-        print(
-            "Note: this is an expected safe-deny if your admin has not "
-            "registered the demo tool yet. Connectivity is working."
-        )
+        print("Control Plane reached successfully.")
     return 0
 
 
@@ -461,13 +536,14 @@ def run_init(args: argparse.Namespace) -> int:
         _run_smoke_test(config)
 
     print("\nNext:")
-    print("  macOS/Linux:")
-    print("    source .env.cintara")
-    print("    python -m cintara_langgraph test")
-    print("  Windows PowerShell:")
-    print("    . .\\.env.cintara.ps1")
-    print("    python -m cintara_langgraph test")
-    print("  import add_cintara_guard from cintara_guard.py in your LangGraph workflow")
+    print("  Add this to your LangGraph workflow:")
+    print("")
+    print("  from cintara_guard import add_cintara_guard")
+    print("  add_cintara_guard(builder, tools_node=\"tools\")")
+    print("")
+    print("  Optional local check:")
+    print("    macOS/Linux: source .env.cintara && python -m cintara_langgraph test")
+    print("    Windows PowerShell: . .\\.env.cintara.ps1; python -m cintara_langgraph test")
     return 0
 
 
@@ -477,43 +553,26 @@ def run_test(args: argparse.Namespace) -> int:
     for key, value in values.items():
         os.environ.setdefault(key, value)
 
-    tool_name = args.tool_name or os.getenv("CINTARA_DEMO_TOOL_NAME") or DEFAULT_TOOL_NAME
-    try:
-        guard = CintaraGuard(agent_id=os.environ["CINTARA_AGENT_ID"])
-        result = guard(
-            {
-                "tool_call": {
-                    "name": tool_name,
-                    "args": {
-                        "to_email": args.to_email,
-                        "body": "Hello from LangGraph.",
-                        "amount": args.amount,
-                    },
-                },
-                "user_id": args.user_id,
-                "tool_risk_tier": args.tool_risk_tier,
-                "session_context": {
-                    "user_email": args.user_email,
-                    "user_roles": [args.user_role],
-                    "request_ip": args.request_ip,
-                },
-            }
-        )
-    except KeyError as exc:
-        print(f"Missing environment value: {exc}")
-        print("Run `python -m cintara_langgraph init` or load `.env.cintara` first.")
-        return 2
-    except Exception as exc:
-        print(f"Cintara smoke test failed: {exc}")
+    missing = [
+        key
+        for key in ("CINTARA_AGENT_ID", "CINTARA_TENANT_ID", "CINTARA_API_TOKEN")
+        if not os.getenv(key)
+    ]
+    if missing:
+        print(f"Missing environment value(s): {', '.join(missing)}")
+        print("Run the Cintara installer or load `.env.cintara` from your project folder first.")
         return 2
 
-    decision = result["cintara"]
-    print("Cintara route:", decision.get("route"))
-    print("Cintara action:", decision.get("action"))
-    print("Reason:", decision.get("reason"))
-    if decision.get("request_id"):
-        print("Request id:", decision["request_id"])
-    return 2 if decision.get("route") == "error" else 0
+    config = InitConfig(
+        agent_id=os.environ["CINTARA_AGENT_ID"],
+        tenant_id=os.environ["CINTARA_TENANT_ID"],
+        policy_url=_clean_url(os.getenv("CINTARA_POLICY_URL") or DEFAULT_POLICY_URL),
+        registry_url=_clean_url(os.getenv("CINTARA_REGISTRY_URL") or DEFAULT_REGISTRY_URL),
+        gateway_url=_clean_url(os.getenv("CINTARA_GATEWAY_URL") or DEFAULT_GATEWAY_URL),
+        api_token=os.environ["CINTARA_API_TOKEN"],
+        tool_name=args.tool_name or os.getenv("CINTARA_DEMO_TOOL_NAME") or DEFAULT_TOOL_NAME,
+    )
+    return _run_smoke_test(config)
 
 
 def run_install(args: argparse.Namespace) -> int:
@@ -532,6 +591,7 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     init_parser = subparsers.add_parser("init", help="Create local Cintara LangGraph onboarding files.")
+    init_parser.add_argument("setup_code", nargs="?", help="Cintara setup code from your Cintara contact.")
     init_parser.add_argument("--agent-id")
     init_parser.add_argument("--tenant-id")
     init_parser.add_argument("--policy-url")
