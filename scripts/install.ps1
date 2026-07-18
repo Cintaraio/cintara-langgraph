@@ -10,7 +10,9 @@ param(
     [string]$PolicyUrl,
     [string]$RegistryUrl = "https://platform.cintara.io/registry",
     [string]$GatewayUrl,
-    [string]$ApiToken,
+    [string]$AuthUrl,
+    [string]$ClientId,
+    [string]$ClientSecret,
     [string]$ToolName = "send_email",
     [string]$ProjectDir = ".",
     [string]$Python,
@@ -121,7 +123,9 @@ Add-ArgumentIfValue ([ref]$initArgs) "--tenant-id" $TenantId
 Add-ArgumentIfValue ([ref]$initArgs) "--policy-url" $PolicyUrl
 Add-ArgumentIfValue ([ref]$initArgs) "--registry-url" $RegistryUrl
 Add-ArgumentIfValue ([ref]$initArgs) "--gateway-url" $GatewayUrl
-Add-ArgumentIfValue ([ref]$initArgs) "--api-token" $ApiToken
+Add-ArgumentIfValue ([ref]$initArgs) "--auth-url" $AuthUrl
+Add-ArgumentIfValue ([ref]$initArgs) "--client-id" $ClientId
+Add-ArgumentIfValue ([ref]$initArgs) "--client-secret" $ClientSecret
 Add-ArgumentIfValue ([ref]$initArgs) "--tool-name" $ToolName
 
 if ($Overwrite) {

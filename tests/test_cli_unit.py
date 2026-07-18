@@ -39,7 +39,9 @@ class CintaraCliUnitTests(unittest.TestCase):
             policy_url="https://platform.cintara.io/policy",
             registry_url="https://platform.cintara.io/registry",
             gateway_url="https://gateway.cintara.io",
-            api_token="token with spaces",
+            auth_url="https://platform.cintara.io/auth",
+            client_id="cid-test-1",
+            client_secret="token with spaces",
             tool_name="send email",
         )
         env_file = build_env_file(config)
@@ -49,7 +51,7 @@ class CintaraCliUnitTests(unittest.TestCase):
             path.write_text(env_file, encoding="utf-8")
             values = load_env_file(path)
 
-        self.assertEqual(values["CINTARA_API_TOKEN"], "token with spaces")
+        self.assertEqual(values["CINTARA_CLIENT_SECRET"], "token with spaces")
         self.assertEqual(values["CINTARA_DEMO_TOOL_NAME"], "send email")
         self.assertIn('$PWD/.venv/bin', env_file)
         self.assertIn('export PATH="$PWD/.venv/bin:$PATH"', env_file)
@@ -61,12 +63,14 @@ class CintaraCliUnitTests(unittest.TestCase):
             policy_url="https://platform.cintara.io/policy",
             registry_url="https://platform.cintara.io/registry",
             gateway_url="https://gateway.cintara.io",
-            api_token="token's value",
+            auth_url="https://platform.cintara.io/auth",
+            client_id="cid-test-1",
+            client_secret="token's value",
         )
 
         powershell_env = build_powershell_env_file(config)
 
-        self.assertIn("$env:CINTARA_API_TOKEN = 'token''s value'", powershell_env)
+        self.assertIn("$env:CINTARA_CLIENT_SECRET = 'token''s value'", powershell_env)
         self.assertIn("$venvScripts = Join-Path (Get-Location) '.venv\\Scripts'", powershell_env)
         self.assertIn('$env:PATH = "$venvScripts;$env:PATH"', powershell_env)
 

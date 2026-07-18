@@ -31,8 +31,10 @@ class CintaraCliIntegrationTests(unittest.TestCase):
                     "https://platform.cintara.io/registry",
                     "--gateway-url",
                     "https://gateway.cintara.io",
-                    "--api-token",
-                    "runtime-token-1",
+                    "--client-id",
+                    "cid-test-1",
+                    "--client-secret",
+                    "cs-test-1",
                     "--tool-name",
                     "send_email",
                     "--skip-smoke-test",
@@ -56,7 +58,8 @@ class CintaraCliIntegrationTests(unittest.TestCase):
             self.assertIn('.venv/bin', env_text)
             self.assertIn(".venv\\Scripts", ps_env_text)
             self.assertIn("export CINTARA_AGENT_ID=agent-1", env_text)
-            self.assertIn("export CINTARA_API_TOKEN=runtime-token-1", env_text)
+            self.assertIn("export CINTARA_CLIENT_ID=cid-test-1", env_text)
+            self.assertIn("export CINTARA_CLIENT_SECRET=cs-test-1", env_text)
 
     def test_generated_shell_env_adds_local_venv_to_path(self):
         if sys.platform.startswith("win") or not shutil.which("bash"):
@@ -82,8 +85,10 @@ class CintaraCliIntegrationTests(unittest.TestCase):
                     "agent-1",
                     "--tenant-id",
                     "tenant-1",
-                    "--api-token",
-                    "runtime-token-1",
+                    "--client-id",
+                    "cid-test-1",
+                    "--client-secret",
+                    "cs-test-1",
                     "--skip-smoke-test",
                 ],
                 cwd=Path(__file__).resolve().parents[1],
@@ -124,8 +129,10 @@ class CintaraCliIntegrationTests(unittest.TestCase):
                     "agent-1",
                     "--tenant-id",
                     "tenant-1",
-                    "--api-token",
-                    "runtime-token-1",
+                    "--client-id",
+                    "cid-test-1",
+                    "--client-secret",
+                    "cs-test-1",
                     "--skip-smoke-test",
                 ],
                 cwd=Path(__file__).resolve().parents[1],

@@ -20,6 +20,7 @@ from .graph import CintaraGuard
 DEFAULT_POLICY_URL = "https://platform.cintara.io/policy"
 DEFAULT_REGISTRY_URL = "https://platform.cintara.io/registry"
 DEFAULT_GATEWAY_URL = "https://gateway.cintara.io"
+DEFAULT_AUTH_URL = "https://platform.cintara.io/auth"
 DEFAULT_TOOL_NAME = "send_email"
 
 
@@ -30,7 +31,9 @@ class InitConfig:
     policy_url: str
     registry_url: str
     gateway_url: str
-    api_token: str
+    auth_url: str
+    client_id: str
+    client_secret: str
     tool_name: str = DEFAULT_TOOL_NAME
 
 
@@ -72,7 +75,9 @@ def build_env_file(config: InitConfig) -> str:
             f"export CINTARA_POLICY_URL={_quote(config.policy_url)}",
             f"export CINTARA_REGISTRY_URL={_quote(config.registry_url)}",
             f"export CINTARA_GATEWAY_URL={_quote(config.gateway_url)}",
-            f"export CINTARA_API_TOKEN={_quote(config.api_token)}",
+            f"export CINTARA_AUTH_URL={_quote(config.auth_url)}",
+            f"export CINTARA_CLIENT_ID={_quote(config.client_id)}",
+            f"export CINTARA_CLIENT_SECRET={_quote(config.client_secret)}",
             f"export CINTARA_TENANT_ID={_quote(config.tenant_id)}",
             f"export CINTARA_AGENT_ID={_quote(config.agent_id)}",
             f"export CINTARA_DEMO_TOOL_NAME={_quote(config.tool_name)}",
@@ -93,7 +98,9 @@ def build_powershell_env_file(config: InitConfig) -> str:
             f"$env:CINTARA_POLICY_URL = {_ps_quote(config.policy_url)}",
             f"$env:CINTARA_REGISTRY_URL = {_ps_quote(config.registry_url)}",
             f"$env:CINTARA_GATEWAY_URL = {_ps_quote(config.gateway_url)}",
-            f"$env:CINTARA_API_TOKEN = {_ps_quote(config.api_token)}",
+            f"$env:CINTARA_AUTH_URL = {_ps_quote(config.auth_url)}",
+            f"$env:CINTARA_CLIENT_ID = {_ps_quote(config.client_id)}",
+            f"$env:CINTARA_CLIENT_SECRET = {_ps_quote(config.client_secret)}",
             f"$env:CINTARA_TENANT_ID = {_ps_quote(config.tenant_id)}",
             f"$env:CINTARA_AGENT_ID = {_ps_quote(config.agent_id)}",
             f"$env:CINTARA_DEMO_TOOL_NAME = {_ps_quote(config.tool_name)}",
@@ -353,7 +360,9 @@ def _collect_self_service_config(args: argparse.Namespace, registry_url: str) ->
         policy_url=_clean_url(str(payload["policy_url"])),
         registry_url=_clean_url(str(payload["registry_url"])),
         gateway_url=_clean_url(str(payload["gateway_url"])),
-        api_token=str(payload["access_token"]),
+        auth_url=_clean_url(str(payload.get("auth_url") or payload["policy_url"])),
+        client_id=str(payload["client_id"]),
+        client_secret=str(payload["client_secret"]),
         tool_name=args.tool_name or os.environ.get("CINTARA_DEMO_TOOL_NAME") or DEFAULT_TOOL_NAME,
     )
 
@@ -367,11 +376,16 @@ def _collect_config(args: argparse.Namespace) -> InitConfig:
     if args.onboarding_code:
         return _collect_self_service_config(args, registry_url)
 
+    auth_url = _clean_url(args.auth_url or env.get("CINTARA_AUTH_URL") or DEFAULT_AUTH_URL)
     agent_id = _prompt("Cintara agent id", args.agent_id or env.get("CINTARA_AGENT_ID"))
     tenant_id = _prompt("Cintara tenant id", args.tenant_id or env.get("CINTARA_TENANT_ID"))
-    api_token = _prompt(
-        "Cintara runtime token from your admin",
-        args.api_token or env.get("CINTARA_API_TOKEN"),
+    client_id = _prompt(
+        "Cintara client id from your admin",
+        args.client_id or env.get("CINTARA_CLIENT_ID"),
+    )
+    client_secret = _prompt(
+        "Cintara client secret from your admin",
+        args.client_secret or env.get("CINTARA_CLIENT_SECRET"),
         secret=True,
     )
 
@@ -379,8 +393,10 @@ def _collect_config(args: argparse.Namespace) -> InitConfig:
         agent_id = "<agent-id>"
     if not tenant_id:
         tenant_id = "<tenant-id>"
-    if not api_token:
-        api_token = "<cintara-runtime-token>"
+    if not client_id:
+        client_id = "<cintara-client-id>"
+    if not client_secret:
+        client_secret = "<cintara-client-secret>"
 
     return InitConfig(
         agent_id=agent_id,
@@ -388,22 +404,31 @@ def _collect_config(args: argparse.Namespace) -> InitConfig:
         policy_url=policy_url,
         registry_url=registry_url,
         gateway_url=gateway_url,
-        api_token=api_token,
+        auth_url=auth_url,
+        client_id=client_id,
+        client_secret=client_secret,
         tool_name=args.tool_name or env.get("CINTARA_DEMO_TOOL_NAME") or DEFAULT_TOOL_NAME,
     )
 
 
 def _run_smoke_test(config: InitConfig) -> int:
-    if _is_placeholder(config.api_token) or _is_placeholder(config.agent_id) or _is_placeholder(config.tenant_id):
+    if (
+        _is_placeholder(config.client_id)
+        or _is_placeholder(config.client_secret)
+        or _is_placeholder(config.agent_id)
+        or _is_placeholder(config.tenant_id)
+    ):
         print("Skipping smoke test because one or more required values are placeholders.")
-        print("Ask your Cintara admin for a generated LangGraph setup command or runtime token.")
+        print("Ask your Cintara admin for a generated LangGraph setup command or credentials.")
         return 0
 
     try:
         client = CintaraClient(
             policy_url=config.policy_url,
             gateway_url=config.gateway_url,
-            token=config.api_token,
+            auth_url=config.auth_url,
+            client_id=config.client_id,
+            client_secret=config.client_secret,
             tenant_id=config.tenant_id,
         )
         guard = CintaraGuard(agent_id=config.agent_id, client=client)
@@ -537,7 +562,9 @@ def build_parser() -> argparse.ArgumentParser:
     init_parser.add_argument("--policy-url")
     init_parser.add_argument("--registry-url")
     init_parser.add_argument("--gateway-url")
-    init_parser.add_argument("--api-token")
+    init_parser.add_argument("--auth-url")
+    init_parser.add_argument("--client-id")
+    init_parser.add_argument("--client-secret")
     init_parser.add_argument("--onboarding-code")
     init_parser.add_argument("--developer-email")
     init_parser.add_argument("--verification-code")
