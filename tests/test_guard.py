@@ -97,11 +97,13 @@ class FakeOnboardingHTTPClient:
             {
                 "agent_id": "agent-1",
                 "tenant_id": "tenant-1",
-                "access_token": "runtime-token-1",
+                "client_id": "cid-onboard-1",
+                "client_secret": "cs-onboard-1",
+                "auth_url": "https://platform.cintara.io/auth",
                 "policy_url": "https://platform.cintara.io/policy",
                 "registry_url": "https://platform.cintara.io/registry",
                 "gateway_url": "https://gateway.cintara.io",
-                "scope": ["policy:decide"],
+                "scopes": [],
             },
         )
 
@@ -279,7 +281,9 @@ class CintaraGuardTests(unittest.TestCase):
             policy_url="https://platform.cintara.io/policy",
             registry_url="https://platform.cintara.io/registry",
             gateway_url="https://gateway.cintara.io",
-            api_token="token with spaces",
+            auth_url="https://platform.cintara.io/auth",
+            client_id="cid-test-1",
+            client_secret="token with spaces",
             tool_name="send_email",
         )
 
@@ -304,8 +308,8 @@ class CintaraGuardTests(unittest.TestCase):
 
         self.assertEqual(env_values["CINTARA_AGENT_ID"], "agent-1")
         self.assertEqual(env_values["CINTARA_TENANT_ID"], "tenant-1")
-        self.assertEqual(env_values["CINTARA_API_TOKEN"], "token with spaces")
-        self.assertIn("$env:CINTARA_API_TOKEN = 'token with spaces'", powershell_env)
+        self.assertEqual(env_values["CINTARA_CLIENT_SECRET"], "token with spaces")
+        self.assertIn("$env:CINTARA_CLIENT_SECRET = 'token with spaces'", powershell_env)
 
     def test_cli_writes_powershell_env_file_with_escaped_values(self):
         config = InitConfig(
@@ -314,12 +318,14 @@ class CintaraGuardTests(unittest.TestCase):
             policy_url="https://platform.cintara.io/policy",
             registry_url="https://platform.cintara.io/registry",
             gateway_url="https://gateway.cintara.io",
-            api_token="token's value",
+            auth_url="https://platform.cintara.io/auth",
+            client_id="cid-test-1",
+            client_secret="token's value",
         )
 
         powershell_env = build_powershell_env_file(config)
 
-        self.assertIn("$env:CINTARA_API_TOKEN = 'token''s value'", powershell_env)
+        self.assertIn("$env:CINTARA_CLIENT_SECRET = 'token''s value'", powershell_env)
 
     def test_cli_does_not_overwrite_existing_files_by_default(self):
         config = InitConfig(
@@ -328,7 +334,9 @@ class CintaraGuardTests(unittest.TestCase):
             policy_url="https://platform.cintara.io/policy",
             registry_url="https://platform.cintara.io/registry",
             gateway_url="https://gateway.cintara.io",
-            api_token="token-1",
+            auth_url="https://platform.cintara.io/auth",
+            client_id="cid-test-1",
+            client_secret="token-1",
         )
 
         with TemporaryDirectory() as tmp:
@@ -342,6 +350,9 @@ class CintaraGuardTests(unittest.TestCase):
     def test_cli_self_service_onboarding_exchanges_verification_code(self):
         fake_http = FakeOnboardingHTTPClient(timeout=15.0)
         args = SimpleNamespace(
+            auth_url=None,
+            client_id=None,
+            client_secret=None,
             onboarding_code="onboard_123",
             developer_email="dev@example.com",
             verification_code="123456",
@@ -353,7 +364,8 @@ class CintaraGuardTests(unittest.TestCase):
 
         self.assertEqual(config.agent_id, "agent-1")
         self.assertEqual(config.tenant_id, "tenant-1")
-        self.assertEqual(config.api_token, "runtime-token-1")
+        self.assertEqual(config.client_id, "cid-onboard-1")
+        self.assertEqual(config.client_secret, "cs-onboard-1")
         self.assertEqual(
             fake_http.calls[0]["url"],
             "https://registry.example.com/api/v1/langgraph/onboarding/onboard_123/start",
@@ -365,6 +377,9 @@ class CintaraGuardTests(unittest.TestCase):
 
     def test_cli_self_service_onboarding_hides_raw_internal_server_error(self):
         args = SimpleNamespace(
+            auth_url=None,
+            client_id=None,
+            client_secret=None,
             onboarding_code="onboard_123",
             developer_email="dev@example.com",
             verification_code="123456",
@@ -396,7 +411,9 @@ class CintaraGuardTests(unittest.TestCase):
             policy_url="https://platform.cintara.io/policy",
             registry_url="https://platform.cintara.io/registry",
             gateway_url="https://gateway.cintara.io",
-            api_token="runtime-token-1",
+            auth_url="https://platform.cintara.io/auth",
+            client_id="cid-test-1",
+            client_secret="runtime-token-1",
             tool_name="send_email",
         )
         stdout = StringIO()
@@ -436,7 +453,9 @@ class CintaraGuardTests(unittest.TestCase):
             policy_url="https://platform.cintara.io/policy",
             registry_url="https://platform.cintara.io/registry",
             gateway_url="https://gateway.cintara.io",
-            api_token="runtime-token-1",
+            auth_url="https://platform.cintara.io/auth",
+            client_id="cid-test-1",
+            client_secret="runtime-token-1",
             tool_name="send_email",
         )
         stdout = StringIO()

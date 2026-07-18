@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import time
 from typing import Any
 
 import httpx
@@ -21,13 +22,25 @@ def _list_from_context(value: Any) -> list[str]:
 
 
 class CintaraClient:
-    """Small HTTP client for the Cintara Trust Control Plane API."""
+    """Small HTTP client for the Cintara Trust Control Plane API.
+
+    Auth (unified): the client holds agent credentials (client_id +
+    client_secret) and exchanges them at POST /auth/token for a short-lived
+    JWT, which is cached and re-exchanged on expiry or a 401. A pre-minted
+    `token` may be passed instead (mainly for tests); it is used as-is.
+    """
+
+    # Refresh the cached token this many seconds before its reported expiry.
+    _TOKEN_SKEW_SECONDS = 30
 
     def __init__(
         self,
         base_url: str | None = None,
         policy_url: str | None = None,
         gateway_url: str | None = None,
+        auth_url: str | None = None,
+        client_id: str | None = None,
+        client_secret: str | None = None,
         token: str | None = None,
         tenant_id: str | None = None,
         timeout: float = 10.0,
@@ -44,14 +57,29 @@ class CintaraClient:
             or common_base_url
             or self.base_url
         ).rstrip("/")
-        self.token = token or os.getenv("CINTARA_API_TOKEN")
+        self.auth_url = (
+            auth_url
+            or os.getenv("CINTARA_AUTH_URL")
+            or common_base_url
+            or self.base_url
+        ).rstrip("/")
+        self.client_id = client_id or os.getenv("CINTARA_CLIENT_ID")
+        self.client_secret = client_secret or os.getenv("CINTARA_CLIENT_SECRET")
         self.tenant_id = tenant_id or os.getenv("CINTARA_TENANT_ID")
         self.timeout = timeout
 
+        # Pre-minted token (tests / advanced use): used as-is, never refreshed.
+        self._static_token = token or os.getenv("CINTARA_API_TOKEN")
+        self._access_token: str | None = None
+        self._token_expires_at: float = 0.0
+
         if not self.base_url:
             raise ValueError("Cintara base URL is required. Set CINTARA_BASE_URL or pass base_url.")
-        if not self.token:
-            raise ValueError("Cintara API token is required. Set CINTARA_API_TOKEN or pass token.")
+        if not self._static_token and not (self.client_id and self.client_secret):
+            raise ValueError(
+                "Cintara credentials are required. Set CINTARA_CLIENT_ID and "
+                "CINTARA_CLIENT_SECRET (or pass client_id/client_secret)."
+            )
         if not self.tenant_id:
             raise ValueError("Cintara tenant ID is required. Set CINTARA_TENANT_ID or pass tenant_id.")
 
@@ -74,12 +102,85 @@ class CintaraClient:
         return self._api_base(self.gateway_url)
 
     @property
-    def headers(self) -> dict[str, str]:
+    def auth_api_base(self) -> str:
+        return self._api_base(self.auth_url)
+
+    # ── Token management ──────────────────────────────────────────────────
+
+    def _exchange_credentials(self) -> str:
+        """client_credentials grant → short-lived access token."""
+        with httpx.Client(timeout=self.timeout) as client:
+            response = client.post(
+                f"{self.auth_api_base}/auth/token",
+                json={
+                    "grant_type": "client_credentials",
+                    "client_id": self.client_id,
+                    "client_secret": self.client_secret,
+                },
+            )
+            response.raise_for_status()
+            data = response.json()
+        self._access_token = str(data["access_token"])
+        expires_in = int(data.get("expires_in") or 300)
+        self._token_expires_at = time.monotonic() + max(
+            expires_in - self._TOKEN_SKEW_SECONDS, 30
+        )
+        return self._access_token
+
+    def _get_token(self, *, force_refresh: bool = False) -> str:
+        if self._static_token:
+            return self._static_token
+        if (
+            force_refresh
+            or self._access_token is None
+            or time.monotonic() >= self._token_expires_at
+        ):
+            return self._exchange_credentials()
+        return self._access_token
+
+    def _headers(self, token: str) -> dict[str, str]:
         return {
-            "Authorization": f"Bearer {self.token}",
+            "Authorization": f"Bearer {token}",
             "Content-Type": "application/json",
             "Accept": "application/json",
         }
+
+    @property
+    def headers(self) -> dict[str, str]:
+        return self._headers(self._get_token())
+
+    def _request(
+        self,
+        method: str,
+        url: str,
+        *,
+        json_body: dict[str, Any] | None = None,
+        extra_headers: dict[str, str] | None = None,
+    ) -> httpx.Response:
+        """Authenticated request; on 401 re-exchange credentials and retry once."""
+        token = self._get_token()
+        for attempt in (0, 1):
+            headers = self._headers(token)
+            if extra_headers:
+                headers.update(extra_headers)
+            with httpx.Client(timeout=self.timeout) as client:
+                if method == "GET":
+                    response = client.get(url, headers=headers)
+                else:
+                    response = client.post(url, headers=headers, json=json_body)
+            # getattr: test doubles may not model status_code.
+            if (
+                getattr(response, "status_code", None) == 401
+                and attempt == 0
+                and not self._static_token
+            ):
+                token = self._get_token(force_refresh=True)
+                continue
+            response.raise_for_status()
+            return response
+        raise RuntimeError("unreachable")  # pragma: no cover
+
+    # ── API surface ───────────────────────────────────────────────────────
 
     def build_request_context(
         self,
@@ -137,14 +238,9 @@ class CintaraClient:
             "session_context": session_context or {},
         }
 
-        with httpx.Client(timeout=self.timeout) as client:
-            response = client.post(
-                f"{self.policy_api_base}/policy/decide",
-                headers=self.headers,
-                json=payload,
-            )
-            response.raise_for_status()
-
+        response = self._request(
+            "POST", f"{self.policy_api_base}/policy/decide", json_body=payload
+        )
         return CintaraDecision.from_api(response.json())
 
     def invoke(
@@ -167,24 +263,18 @@ class CintaraClient:
             "agent_group": agent_group,
             "session_context": session_context or {},
         }
-        headers = dict(self.headers)
-        if idempotency_key:
-            headers["Idempotency-Key"] = idempotency_key
+        extra = {"Idempotency-Key": idempotency_key} if idempotency_key else None
 
-        with httpx.Client(timeout=self.timeout) as client:
-            response = client.post(
-                f"{self.gateway_api_base}/invoke/",
-                headers=headers,
-                json=payload,
-            )
-            response.raise_for_status()
-            return response.json()
+        response = self._request(
+            "POST",
+            f"{self.gateway_api_base}/invoke/",
+            json_body=payload,
+            extra_headers=extra,
+        )
+        return response.json()
 
     def poll(self, request_id: str) -> dict[str, Any]:
-        with httpx.Client(timeout=self.timeout) as client:
-            response = client.get(
-                f"{self.gateway_api_base}/invoke/{request_id}/result",
-                headers=self.headers,
-            )
-            response.raise_for_status()
-            return response.json()
+        response = self._request(
+            "GET", f"{self.gateway_api_base}/invoke/{request_id}/result"
+        )
+        return response.json()
