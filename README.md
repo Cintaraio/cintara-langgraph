@@ -287,3 +287,11 @@ The current Cintara gateway already has the right production surface:
 - approvals and audit services behind the gateway
 
 This integration starts with `policy/decide` because it is the smallest, easiest insertion point in a LangGraph workflow: one pre-tool guard node.
+
+### Governed Showcase path (v0.1.1)
+
+`GovernedWorkflow` adds a fail-closed invocation lifecycle alongside the existing advisory guard. It supports exactly one configured tool: submit with a persisted idempotency key, poll the real approval record, reauthorize the exact parameters, execute the isolated sandbox endpoint and record the outcome. `approved: true` in a LangGraph resume does not grant execution authority. See `examples/showcase_governed.py`.
+
+`workflow.node` is a LangGraph node that performs that lifecycle. Checkpoint `cintara_idempotency_key` before entering it and route its result to `END`; it already executes the configured sandbox tool. Do not append an unchecked tool executor. For customer tools, implement an equivalent idempotent dispatch boundary in the customer's server; this showcase endpoint only creates synthetic obligation tasks.
+
+Install the tested immutable commit recorded in the showcase release manifest. Keep credentials in server-side `.env.cintara` files (created with private permissions and excluded from Git). The initializer prepares new example/configuration files; it does not rewrite an existing graph. Connectivity and advisory policy evaluation do not establish successful governed execution. Readiness requires allow, reviewer, rejection and block checks against the actual configured services.

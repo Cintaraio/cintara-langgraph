@@ -34,9 +34,7 @@ class CintaraClient:
     ) -> None:
         common_base_url = base_url or os.getenv("CINTARA_BASE_URL") or ""
         self.base_url = (
-            policy_url
-            or os.getenv("CINTARA_POLICY_URL")
-            or common_base_url
+            policy_url or os.getenv("CINTARA_POLICY_URL") or common_base_url
         ).rstrip("/")
         self.gateway_url = (
             gateway_url
@@ -49,11 +47,17 @@ class CintaraClient:
         self.timeout = timeout
 
         if not self.base_url:
-            raise ValueError("Cintara base URL is required. Set CINTARA_BASE_URL or pass base_url.")
+            raise ValueError(
+                "Cintara base URL is required. Set CINTARA_BASE_URL or pass base_url."
+            )
         if not self.token:
-            raise ValueError("Cintara API token is required. Set CINTARA_API_TOKEN or pass token.")
+            raise ValueError(
+                "Cintara API token is required. Set CINTARA_API_TOKEN or pass token."
+            )
         if not self.tenant_id:
-            raise ValueError("Cintara tenant ID is required. Set CINTARA_TENANT_ID or pass tenant_id.")
+            raise ValueError(
+                "Cintara tenant ID is required. Set CINTARA_TENANT_ID or pass tenant_id."
+            )
 
     @staticmethod
     def _api_base(url: str) -> str:
@@ -92,7 +96,9 @@ class CintaraClient:
             "user": {
                 "id": user_id,
                 "email": str(context.get("user_email") or context.get("email") or ""),
-                "roles": _list_from_context(context.get("user_roles") or context.get("roles")),
+                "roles": _list_from_context(
+                    context.get("user_roles") or context.get("roles")
+                ),
                 "privileges": _list_from_context(
                     context.get("user_privileges") or context.get("privileges")
                 ),
@@ -101,7 +107,9 @@ class CintaraClient:
                 "id": self.tenant_id,
             },
             "request": {
-                "ip_address": str(context.get("request_ip") or context.get("ip_address") or ""),
+                "ip_address": str(
+                    context.get("request_ip") or context.get("ip_address") or ""
+                ),
                 "user_agent": str(context.get("user_agent") or ""),
             },
             "context_version": "v1",
@@ -185,6 +193,44 @@ class CintaraClient:
             response = client.get(
                 f"{self.gateway_api_base}/invoke/{request_id}/result",
                 headers=self.headers,
+            )
+            response.raise_for_status()
+            return response.json()
+
+    def authorize_execution(
+        self, request_id: str, *, tool_call: CintaraToolCall
+    ) -> dict[str, Any]:
+        """A current server grant is required immediately before dispatch."""
+        with httpx.Client(timeout=self.timeout) as client:
+            response = client.post(
+                f"{self.gateway_api_base}/invoke/{request_id}/authorize-execution",
+                headers=self.headers,
+                json={"tool_name": tool_call.name, "parameters": tool_call.args},
+            )
+            response.raise_for_status()
+            return response.json()
+
+    def record_outcome(
+        self, request_id: str, *, outcome: str, result: dict[str, Any]
+    ) -> dict[str, Any]:
+        with httpx.Client(timeout=self.timeout) as client:
+            response = client.post(
+                f"{self.gateway_api_base}/invoke/{request_id}/outcome",
+                headers=self.headers,
+                json={"outcome": outcome, "result": result},
+            )
+            response.raise_for_status()
+            return response.json()
+
+    def execute_sandbox(
+        self, request_id: str, *, tool_call: CintaraToolCall
+    ) -> dict[str, Any]:
+        """Showcase only: server reauthorizes and atomically records one sandbox task."""
+        with httpx.Client(timeout=self.timeout) as client:
+            response = client.post(
+                f"{self.gateway_api_base}/invoke/{request_id}/sandbox-execution",
+                headers=self.headers,
+                json={"tool_name": tool_call.name, "parameters": tool_call.args},
             )
             response.raise_for_status()
             return response.json()
